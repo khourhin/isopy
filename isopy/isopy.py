@@ -1,6 +1,7 @@
 """A library for alternative splicing analysis using long read technology """
 
 from pynextgen.basics_fasta import Fasta
+import pybedtools
 import pynextgen.bed as bed
 import pandas as pd
 import numpy as np
@@ -11,6 +12,7 @@ import os
 OVERHANG_5 = 9
 OVERHANG_3 = 6
 OUT_DIR = "isopy_out"
+GENOME = "mm10"
 
 
 def exec_command(cmd, silent=False):
@@ -46,11 +48,10 @@ class ExonIdentifier(object):
         self.genome = genome_fas
         self.reads = reads_fas
         self.out_dir = out_dir
-        self.fasta = None
-
         os.makedirs(self.out_dir)
 
         self.bam = self._map_reads_to_genome()
+        self.exons_fasta = self._extract_exons()
 
     def _map_reads_to_genome(self):
         """ Map long reads to the genome
@@ -67,6 +68,33 @@ class ExonIdentifier(object):
         exec_command(minimap_cmd)
 
         return bam
+
+    def _extract_exons(self):
+        """ From the bam alignment, get a bed with the regions of putative exons
+        """
+
+        exons_df = (
+            pybedtools.BedTool(self.bam).bam_to_bed(split=True).sort().to_dataframe()
+        )
+
+        # Keep only interval information
+        exons_df = exons_df.loc[:, ["chrom", "start", "end"]]
+
+        exons_df = (
+            exons_df.groupby(["chrom", "start", "end"])
+            .size()
+            .reset_index(name="frequency")
+        )
+
+        print(exons_df)
+
+        # FIXME: This is using UCSC chro sizes (probably in conflict with ensembl)
+        # putative_exons = putative_exons.slop(b=2, genome=GENOME)
+
+        # putative_exons = putative_exons.sequence(
+        #    fi=self.genome, fo=os.path.join(self.out_dir, "identified_exons.fas")
+        # )
+        # return putative_exons.seqfn
 
 
 class Transcripts(object):

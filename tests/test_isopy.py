@@ -38,21 +38,22 @@ def test_Transcripts(tmpdir, datadir):
     assert md5(transcripts.junction_bed.path) == md5(datadir / "ref_mock_junctions.bed")
 
 
-# def test_ExonIdentifier(tmpdir, datadir):
-#     """ Test the ExonIdentifier object
-#     """
-#     transcripts = Transcripts(
-#         (datadir / "mock_exon_composition.csv"),
-#         (datadir / "mock_exons.fas"),
-#         fasta_out=(tmpdir / "mock_transcripts.fasta"),
-#         exon_bed_out=(tmpdir / "mock_exons.bed"),
-#         junction_bed_out=(tmpdir / "mock_junction.bed"),
-#     )
+def test_ExonIdentifier(tmpdir, datadir):
+    """ Test the ExonIdentifier object
+    """
+    transcripts = Transcripts(
+        (datadir / "mock_exon_composition.csv"),
+        (datadir / "mock_exons.fas"),
+        fasta_out=(tmpdir / "mock_transcripts.fasta"),
+        exon_bed_out=(tmpdir / "mock_exons.bed"),
+        junction_bed_out=(tmpdir / "mock_junction.bed"),
+    )
 
-#     exons = ExonIdentifier(
-#         reads_fas=transcripts.fasta,
-#         genome_fas=(datadir / "mock_genome.fas"),
-#         out_dir=(tmpdir / "ali"),
-#     )
+    exons = ExonIdentifier(
+        reads_fas=transcripts.fasta,
+        # Has to be converted to str for bedtools to use it properly for chromSizes
+        genome_fas=str(datadir / "mock_genome.fas"),
+        out_dir=(tmpdir / "ali"),
+    )
 
-#     assert md5(datadir / "mock_exons.fas") == md5(exons.fasta)
+    assert md5(datadir / "mock_exons.fas") == md5(exons.exons_fasta)
