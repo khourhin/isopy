@@ -24,7 +24,7 @@ class Transcripts(object):
 
     def __init__(
         self,
-        exon_composition_xls,
+        exon_composition_csv,
         exon_fasta,
         fasta_out="artificial_transcripts.fas",
         exon_bed_out="artificial_transcripts_exons.bed",
@@ -39,19 +39,25 @@ class Transcripts(object):
         corresponding to the IDs in exon_composition_matrix
 
         """
-        self.exon_composition_df = pd.read_excel(exon_composition_xls, index_col=0)
+        self.exon_composition_df = pd.read_csv(exon_composition_csv, index_col=0)
         self.exon_bed, self.junction_bed, self.fasta = self._build_fasta_bed_from_exon_composition(
             exon_fasta, fasta_out, exon_bed_out, junction_bed_out
         )
         self.exon_bed.to_saf()
         self.junction_bed.to_saf()
 
+    def __repr__(self):
+
+        # Since row are transcripts_id and columns exons
+        n_transcripts, n_exons = self.exon_composition_df.shape
+        return f"<Collection Object of {n_transcripts} transcripts with {n_exons} potential exons>"
+
     def _get_exons(self, row):
         """
         Extract a list of exons from a line of the exon composition matrix
         """
 
-        exons = list(row[row == 1].index)
+        exons = list(row[row == True].index)
         return exons
 
     def _build_fasta_bed_from_exon_composition(
