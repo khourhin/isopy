@@ -4,17 +4,69 @@ from pynextgen.basics_fasta import Fasta
 import pynextgen.bed as bed
 import pandas as pd
 import numpy as np
+import subprocess
+import os
 
 # Number of basis in 5' and 3' of a junction to make it specific in our dataset
 OVERHANG_5 = 9
 OVERHANG_3 = 6
+OUT_DIR = "isopy_out"
+
+
+def exec_command(cmd, silent=False):
+    """ Wrapper for proper execution of subprocesses
+    """
+
+    try:
+        proc = subprocess.run(
+            cmd,
+            shell=True,
+            check=True,
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            universal_newlines=True,
+        )
+        if not silent and proc.stdout:
+            print(proc.stdout.strip())
+            return proc.stdout
+
+    except subprocess.CalledProcessError as exc:
+        raise ChildProcessError(exc.stderr)
 
 
 class ExonIdentifier(object):
-    """ A tool to identify exons from BAM files
+    def __init__(self, reads_fas, genome_fas, out_dir=OUT_DIR):
+        """ A tool to identify exons from BAM files
 
-    .. todo:: Implement here mapping step (start from fasta and reference genome)
-    """
+        :param reads_fas: Path to fasta files with long reads.
+        :param genome_fas: Path to fasta file of the genome to map to.
+        :param out_dir: Path to the output directory
+        """
+
+        self.genome = genome_fas
+        self.reads = reads_fas
+        self.out_dir = out_dir
+        self.fasta = None
+
+        os.makedirs(self.out_dir)
+
+        self.bam = self._map_reads_to_genome()
+
+    def _map_reads_to_genome(self):
+        """ Map long reads to the genome
+        """
+
+        bam = os.path.basename(os.path.splitext(self.reads)[0] + ".bam")
+        bam = os.path.join(self.out_dir, bam)
+
+        minimap_cmd = f"minimap2 -ax splice -uf {self.genome} {self.reads} \
+        | samtools view -bh \
+        | samtools sort \
+        > {bam}"
+
+        exec_command(minimap_cmd)
+
+        return bam
 
 
 class Transcripts(object):
