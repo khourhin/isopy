@@ -3,10 +3,8 @@
 
 """Tests for `isopy` package."""
 
-import pytest
-import pandas as pd
+from easydev import md5
 from click.testing import CliRunner
-import shutil
 
 from isopy.isopy import Transcripts
 from isopy import cli
@@ -35,4 +33,6 @@ def test_Transcripts(tmpdir, datadir):
         junction_bed_out=(tmpdir / "mock_junction.bed"),
     )
 
-    print(transcripts)
+    assert md5(transcripts.fasta) == md5(datadir / "ref_mock_transcripts.fasta")
+    assert md5(transcripts.exon_bed.path) == md5(datadir / "ref_mock_exons.bed")
+    assert md5(transcripts.junction_bed.path) == md5(datadir / "ref_mock_junction.bed")

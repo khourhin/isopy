@@ -1,0 +1,12 @@
+transcript_1	0	30	E1	0	.
+transcript_1	30	60	E2	0	.
+transcript_1	60	90	E3	0	.
+transcript_1	90	120	E4	0	.
+transcript_2	0	30	E1	0	.
+transcript_2	30	60	E2	0	.
+transcript_2	60	90	E4	0	.
+transcript_3	0	30	E1	0	.
+transcript_3	30	60	E3	0	.
+transcript_3	60	90	E4	0	.
+transcript_4	0	30	E1	0	.
+transcript_4	30	60	E4	0	.
