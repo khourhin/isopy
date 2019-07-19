@@ -1,4 +1,4 @@
-Welcome to isopy's documentation!
+Welcome to Isopy's documentation!
 ======================================
 
 .. toctree::

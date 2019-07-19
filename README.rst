@@ -1,5 +1,5 @@
 =====
-isopy
+Isopy
 =====
 
 
@@ -35,7 +35,9 @@ Documentation Todolist
 Features
 --------
 
-.. todo:: Add features
+- Identify exons using long read dataset
+
+.. todo:: Complete features
 
 Credits
 -------
