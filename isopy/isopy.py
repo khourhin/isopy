@@ -55,7 +55,7 @@ class ExonIdentifier(object):
         self._filter_exons_by_canonical_splice_sites()
         self._filter_exons_by_read_support(min_read_count)
 
-        self.export_to_bed()
+        self.exons_fas_fn, self.exons_bed_fn = self.export()
 
     def _map_reads_to_genome(self):
         """ Map long reads to the genome. Using Minimap2.
@@ -77,8 +77,8 @@ class ExonIdentifier(object):
         """ From the bam alignment, get a dataframe with the regions of putative exons
         """
 
-        def get_splice_sites(row):
-            """ Function to apply to an exon dataframe to obtain splice sites
+        def get_sequence_and_splice_sites(row):
+            """ Function to apply to an exon dataframe to obtain exon sequence and splice sites
             """
 
             # Get 2 bases upstream and downstream of the exon
@@ -88,7 +88,8 @@ class ExonIdentifier(object):
             donor = sequence[0:2]
             acceptor = sequence[-2:]
 
-            return (donor, acceptor)
+            # Series are used to cast the result of apply in 2 columns
+            return pd.Series([sequence[2:-2], (donor, acceptor)])
 
         # Extract mapped intervals from the bam alignement file
         exons_df = BedTool(self.bam).bam_to_bed(split=True).sort().to_dataframe()
@@ -103,9 +104,10 @@ class ExonIdentifier(object):
             .reset_index(name="frequency")
         )
 
-        # Add splice sites information
-        exons_df.loc[:, "splice_sites"] = exons_df.apply(get_splice_sites, axis=1)
-
+        # Add sequence and splice sites information
+        exons_df[["sequence", "splice_sites"]] = exons_df.apply(
+            get_sequence_and_splice_sites, axis=1
+        )
         return exons_df
 
     def _filter_exons_by_canonical_splice_sites(self):
@@ -124,15 +126,25 @@ class ExonIdentifier(object):
 
         self.exons_df = self.exons_df.loc[self.exons_df.frequency >= n]
 
-    def export_to_bed(self):
-        """ Convert the dataframe self.exons_df to a bed file
+    def export(self):
+        """ Convert the dataframe self.exons_df to a bed file and fasta file
+        and name the exons.
         """
 
-        bed_df = self.exons_df.copy()
-        bed_df.drop(["splice_sites"], axis=1, inplace=True)
-        bed_df.insert(3, "name", [f"E{n}" for n in range(1, len(bed_df) + 1)])
+        exon_fas_fn = os.path.join(self.out_dir, "test.fas")
+        exon_bed_fn = os.path.join(self.out_dir, "test.bed")
 
-        BedTool.from_dataframe(bed_df).saveas(os.path.join(self.out_dir, "test.bed"))
+        export_df = self.exons_df.copy()
+        export_df.insert(3, "exon_id", [f"E{n}" for n in range(1, len(export_df) + 1)])
+
+        with open(exon_fas_fn, "w") as fas_out:
+            for index, exon in export_df.iterrows():
+                fas_out.write(f">{exon.exon_id}\n{exon.sequence}\n")
+
+        export_df.drop(["sequence", "splice_sites"], axis=1, inplace=True)
+        BedTool.from_dataframe(export_df).saveas(exon_bed_fn)
+
+        return (exon_fas_fn, exon_bed_fn)
 
 
 class Transcripts(object):

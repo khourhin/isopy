@@ -1,5 +1,5 @@
-* TODO Implement exon identification [2/2] :0.2:
-  SCHEDULED: <2019-07-19 Fri>
+* DONE Implement exon identification [3/3] :0.2:
+  CLOSED: [2019-07-19 Fri 11:11] SCHEDULED: <2019-07-19 Fri>
 
   - [X] Prepare test dataset
     
@@ -8,7 +8,7 @@
   - [X] From multiple alignments of long reads against a genome, extract a list of
   putative exons as dataframe.
 
-  - [ ] Export exons to bed and fasta files
+  - [X] Export exons to bed and fasta files
 
 * Next  
 
