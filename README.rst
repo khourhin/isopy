@@ -26,11 +26,16 @@ Library for Iso-seq analysis
 * Free software: GNU General Public License v3
 * Documentation: https://isopy.readthedocs.io.
 
+Documentation Todolist
+----------------------
 
+.. todolist::
+
+  
 Features
 --------
 
-* TODO
+.. todo:: Add features
 
 Credits
 -------

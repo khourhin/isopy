@@ -15,6 +15,10 @@
   - Verify how this is working and what would change with a gene on the - strand !!!
 
   - Deal with cryptic exons (especially at the time of naming exons in isopy.export_to_bed) 
+
+  - CORNERCASE: Adding chromsize to be sure to be in the bounderies of
+    chromosomes when checking splicing sites
+
 * TODO Biblio
 
 - See with EA:

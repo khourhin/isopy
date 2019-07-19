@@ -1,5 +1,7 @@
 .. highlight:: shell
 
+.. warning:: THIS WAS NOT EDITED AFTER COOKIECUTTER
+	       
 ============
 Contributing
 ============

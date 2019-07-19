@@ -1,3 +1,5 @@
+.. todo:: Complete with log from org file
+
 =======
 History
 =======
