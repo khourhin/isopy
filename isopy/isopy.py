@@ -1,7 +1,7 @@
 """A library for alternative splicing analysis using long read technology """
 
 from pynextgen.basics_fasta import Fasta
-import pybedtools
+from pybedtools import BedTool
 import pynextgen.bed as bed
 import pandas as pd
 import numpy as np
@@ -37,24 +37,28 @@ def exec_command(cmd, silent=False):
 
 
 class ExonIdentifier(object):
-    def __init__(self, reads_fas, genome_fas, out_dir=OUT_DIR):
+    def __init__(self, reads_fas, genome_fas, out_dir=OUT_DIR, min_read_count=0):
         """ A tool to identify exons from BAM files
 
         :param reads_fas: Path to fasta files with long reads.
         :param genome_fas: Path to fasta file of the genome to map to.
-        :param out_dir: Path to the output directory
+        :param out_dir: Path to the output directory.
+        :param min_read_count: The minimum number of read supporting an exon for the the exon to be considered.
         """
-
         self.genome = genome_fas
         self.reads = reads_fas
         self.out_dir = out_dir
         os.makedirs(self.out_dir)
 
         self.bam = self._map_reads_to_genome()
-        self.exons_fasta = self._extract_exons()
+        self.exons_df = self._extract_raw_exons()
+        self._filter_exons_by_canonical_splice_sites()
+        self._filter_exons_by_read_support(min_read_count)
+
+        self.export_to_bed()
 
     def _map_reads_to_genome(self):
-        """ Map long reads to the genome
+        """ Map long reads to the genome. Using Minimap2.
         """
 
         bam = os.path.basename(os.path.splitext(self.reads)[0] + ".bam")
@@ -69,32 +73,66 @@ class ExonIdentifier(object):
 
         return bam
 
-    def _extract_exons(self):
-        """ From the bam alignment, get a bed with the regions of putative exons
+    def _extract_raw_exons(self):
+        """ From the bam alignment, get a dataframe with the regions of putative exons
         """
 
-        exons_df = (
-            pybedtools.BedTool(self.bam).bam_to_bed(split=True).sort().to_dataframe()
-        )
+        def get_splice_sites(row):
+            """ Function to apply to an exon dataframe to obtain splice sites
+            """
+
+            # Get 2 bases upstream and downstream of the exon
+            sequence = BedTool.seq(
+                (row["chrom"], row["start"] - 2, row["end"] + 2), self.genome
+            )
+            donor = sequence[0:2]
+            acceptor = sequence[-2:]
+
+            return (donor, acceptor)
+
+        # Extract mapped intervals from the bam alignement file
+        exons_df = BedTool(self.bam).bam_to_bed(split=True).sort().to_dataframe()
 
         # Keep only interval information
         exons_df = exons_df.loc[:, ["chrom", "start", "end"]]
 
+        # Add number of reads found to support a particular exon
         exons_df = (
             exons_df.groupby(["chrom", "start", "end"])
             .size()
             .reset_index(name="frequency")
         )
 
-        print(exons_df)
+        # Add splice sites information
+        exons_df.loc[:, "splice_sites"] = exons_df.apply(get_splice_sites, axis=1)
 
-        # FIXME: This is using UCSC chro sizes (probably in conflict with ensembl)
-        # putative_exons = putative_exons.slop(b=2, genome=GENOME)
+        return exons_df
 
-        # putative_exons = putative_exons.sequence(
-        #    fi=self.genome, fo=os.path.join(self.out_dir, "identified_exons.fas")
-        # )
-        # return putative_exons.seqfn
+    def _filter_exons_by_canonical_splice_sites(self):
+        """ Keep only exons with canonical splices sites
+        (ie GT-AG, AT-AC, GT-AC, AT-AG)
+        """
+
+        canonical_junctions = (("AG", "GT"), ("AC", "AT"), ("AC", "GT"), ("AG", "AT"))
+        self.exons_df = self.exons_df.loc[
+            self.exons_df.splice_sites.isin(canonical_junctions)
+        ]
+
+    def _filter_exons_by_read_support(self, n):
+        """ Filter only exons supported by at least n reads.
+        """
+
+        self.exons_df = self.exons_df.loc[self.exons_df.frequency >= n]
+
+    def export_to_bed(self):
+        """ Convert the dataframe self.exons_df to a bed file
+        """
+
+        bed_df = self.exons_df.copy()
+        bed_df.drop(["splice_sites"], axis=1, inplace=True)
+        bed_df.insert(3, "name", [f"E{n}" for n in range(1, len(bed_df) + 1)])
+
+        BedTool.from_dataframe(bed_df).saveas(os.path.join(self.out_dir, "test.bed"))
 
 
 class Transcripts(object):

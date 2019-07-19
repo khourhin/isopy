@@ -1,0 +1,26 @@
+* TODO Implement exon identification [2/2] :0.2:
+  SCHEDULED: <2019-07-19 Fri>
+
+  - [X] Prepare test dataset
+    
+    > Using GPHN gene and previously described 40 exons
+
+  - [X] From multiple alignments of long reads against a genome, extract a list of
+  putative exons as dataframe.
+
+  - [ ] Export exons to bed and fasta files
+
+* Next  
+
+  - Verify how this is working and what would change with a gene on the - strand !!!
+
+  - Deal with cryptic exons (especially at the time of naming exons in isopy.export_to_bed) 
+* TODO Biblio
+
+- See with EA:
+  Implement criteria to further selected exons like in https://www.biorxiv.org/content/early/2018/02/05/260562.full.pdf
+  - Looking for inserts in read mapping against transcriptome
+  - Candidate exons from the mapping to genome should be 6nt away from known exon
+  - Quantification by alignment to pseudo-transcriptome (downweight for multimappers), TMM norm.
+
+
