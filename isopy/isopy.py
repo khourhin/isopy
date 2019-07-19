@@ -7,15 +7,18 @@ import pandas as pd
 import numpy as np
 import subprocess
 import os
+import logging
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
 
 # Number of basis in 5' and 3' of a junction to make it specific in our dataset
 OVERHANG_5 = 9
 OVERHANG_3 = 6
 OUT_DIR = "isopy_out"
-GENOME = "mm10"
 
 
-def exec_command(cmd, silent=False):
+def _exec_command(cmd, silent=False):
     """ Wrapper for proper execution of subprocesses
     """
 
@@ -37,14 +40,15 @@ def exec_command(cmd, silent=False):
 
 
 class ExonIdentifier(object):
-    def __init__(self, reads_fas, genome_fas, out_dir=OUT_DIR, min_read_count=0):
-        """ A tool to identify exons from BAM files
+    """ A tool to identify exons from BAM files
 
-        :param reads_fas: Path to fasta files with long reads.
-        :param genome_fas: Path to fasta file of the genome to map to.
+        :param reads_fas: Path to the fasta file with long reads.
+        :param genome_fas: Path to the fasta file of the genome to map to.
         :param out_dir: Path to the output directory.
         :param min_read_count: The minimum number of read supporting an exon for the the exon to be considered.
         """
+
+    def __init__(self, reads_fas, genome_fas, out_dir=OUT_DIR, min_read_count=0):
         self.genome = genome_fas
         self.reads = reads_fas
         self.out_dir = out_dir
@@ -69,7 +73,9 @@ class ExonIdentifier(object):
         | samtools sort \
         > {bam}"
 
-        exec_command(minimap_cmd)
+        logging.debug("Minimap2 START")
+        _exec_command(minimap_cmd)
+        logging.debug("Minimap2 DONE")
 
         return bam
 
@@ -91,6 +97,7 @@ class ExonIdentifier(object):
             # Series are used to cast the result of apply in 2 columns
             return pd.Series([sequence[2:-2], (donor, acceptor)])
 
+        logging.debug("Raw exon extraction START")
         # Extract mapped intervals from the bam alignement file
         exons_df = BedTool(self.bam).bam_to_bed(split=True).sort().to_dataframe()
 
@@ -108,6 +115,8 @@ class ExonIdentifier(object):
         exons_df[["sequence", "splice_sites"]] = exons_df.apply(
             get_sequence_and_splice_sites, axis=1
         )
+
+        logging.debug("Raw exon extraction DONE")
         return exons_df
 
     def _filter_exons_by_canonical_splice_sites(self):
@@ -115,16 +124,24 @@ class ExonIdentifier(object):
         (ie GT-AG, AT-AC, GT-AC, AT-AG)
         """
 
+        logging.debug("Filter exons by canonical splice sites START")
+
         canonical_junctions = (("AG", "GT"), ("AC", "AT"), ("AC", "GT"), ("AG", "AT"))
         self.exons_df = self.exons_df.loc[
             self.exons_df.splice_sites.isin(canonical_junctions)
         ]
 
+        logging.debug("Filter exons by canonical splice sites DONE")
+
     def _filter_exons_by_read_support(self, n):
         """ Filter only exons supported by at least n reads.
         """
 
+        logging.debug("Filter exons by read support START")
+
         self.exons_df = self.exons_df.loc[self.exons_df.frequency >= n]
+
+        logging.debug("Filter exons by read support DONE")
 
     def export(self):
         """ Convert the dataframe self.exons_df to a bed file and fasta file
@@ -150,6 +167,10 @@ class ExonIdentifier(object):
 class Transcripts(object):
     """Representation of a set of transcripts. Transcripts are herein first defined by
     their exon_composition
+
+    :param exon_composition_matrix: An dataframe in Excel format with as index the transcripts IDs and as columns the exon names. IMPORTANT: The exons in columns should be ordered in order of appearance in the trancript !!
+        
+    :param exon_fasta: A fasta file with the sequence of each exons with IDs corresponding to the IDs in exon_composition_matrix
     """
 
     def __init__(
@@ -160,15 +181,6 @@ class Transcripts(object):
         exon_bed_out="artificial_transcripts_exons.bed",
         junction_bed_out="artificial_transcripts_junctions.bed",
     ):
-        """
-        :param exon_composition_matrix: An dataframe in Excel format with as index
-        the transcripts IDs and as columns the exon names. IMPORTANT: The exons
-        in columns should be ordered in order of appearance in the trancript !!
-        
-        :param exon_fas_ta: A fasta file with the sequence of each exons with IDs
-        corresponding to the IDs in exon_composition_matrix
-
-        """
         self.exon_composition_df = pd.read_csv(exon_composition_csv, index_col=0)
         self.exon_bed, self.junction_bed, self.fasta = self._build_fasta_bed_from_exon_composition(
             exon_fasta, fasta_out, exon_bed_out, junction_bed_out
