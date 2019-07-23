@@ -234,7 +234,7 @@ class Transcripts(object):
         column_order = natsorted(list(junctions_df.columns))
 
         junctions_df = junctions_df.loc[index_order, column_order]
-        junctions_df = junctions_df.astype(int)
+        junctions_df = junctions_df.astype(bool)
 
         return junctions_df
 
