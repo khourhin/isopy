@@ -6,8 +6,10 @@
 from easydev import md5
 from click.testing import CliRunner
 
-from isopy.isopy import Transcripts, ExonIdentifier
+from isopy.isopy import Transcripts, ExonIdentifier, TranscriptCluster
 from isopy import cli
+
+THREADS = 4
 
 
 def test_command_line_interface():
@@ -56,4 +58,9 @@ def test_ExonIdentifier(tmpdir, datadir):
         out_dir=(tmpdir / "ali"),
     )
 
-    assert md5(datadir / "mock_exons.fas") == md5(exons.exons_fas_fn)
+    assert md5(datadir / "mock_exons.fas") == md5(exons.exon_fas_fn)
+
+    # Test the TranscriptCluster object
+
+    clusters = TranscriptCluster(exons, THREADS)
+    print(clusters.cluster_df)

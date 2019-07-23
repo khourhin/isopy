@@ -41,7 +41,7 @@ def _exec_command(cmd, silent=False):
 
 
 class ExonIdentifier(object):
-    """ A tool to identify exons from BAM files
+    """ A tool to identify exons from long reads and a reference genome
 
         :param reads_fas: Path to the fasta file with long reads.
         :param genome_fas: Path to the fasta file of the genome to map to.
@@ -60,7 +60,7 @@ class ExonIdentifier(object):
         self._filter_exons_by_canonical_splice_sites()
         self._filter_exons_by_read_support(min_read_count)
 
-        self.exons_fas_fn, self.exons_bed_fn = self.export()
+        self.exon_fas_fn, self.exon_bed_fn = self.export()
 
     def _map_reads_to_genome(self):
         """ Map long reads to the genome. Using Minimap2.
@@ -163,6 +163,84 @@ class ExonIdentifier(object):
         BedTool.from_dataframe(export_df).saveas(exon_bed_fn)
 
         return (exon_fas_fn, exon_bed_fn)
+
+
+class TranscriptCluster(object):
+    """ Cluster long reads based on their exon composition. 
+    
+        :param exon_identifier_object: An ExonIdentifier object
+        :returns: 
+        :rtype: 
+    """
+
+    def __init__(self, exon_identifier_object, threads):
+
+        self.exon_fas = exon_identifier_object.exon_fas_fn
+        self.read_fas = exon_identifier_object.reads
+        self.threads = threads
+
+        self._format_blast_db()
+        self.blast_df = self._run_blast_versus_exons()
+        self.exon_composition_df = self._get_exon_composition_from_blast()
+        self.cluster_df = self._cluster_reads()
+
+    def __repr__(self):
+
+        return "<TranscriptCluster object for Iso-seq analyis>"
+
+    def _format_blast_db(self):
+        """ Generate the blast db for exons using makeblastdb
+        """
+
+        blastdb_cmd = f"makeblastdb -dbtype nucl -in {self.exon_fas}"
+        _exec_command(blastdb_cmd)
+
+    def _run_blast_versus_exons(self, out_file="blast_out.tab"):
+        """ Execute blast of transcripts against exons identified by ExonIdentifier
+        """
+
+        blast_cmd = f"blastn -num_threads {self.threads} -outfmt 6 -task 'blastn-short' \
+        -evalue 0.001 -penalty -2 -query {self.read_fas} -db {self.exon_fas} > {out_file}"
+
+        _exec_command(blast_cmd)
+
+        blast_df = pd.read_csv(out_file, sep="\t", header=None)
+        return blast_df
+
+    def _get_exon_composition_from_blast(self, id_threshold=90):
+        """ Filter blast results by identity percent threshold
+        """
+
+        exon_composition_df = (
+            pd.pivot_table(self.blast_df, values=2, columns=1, index=0) > 90
+        )
+
+        column_order = natsorted(exon_composition_df.columns)
+        exon_composition_df = exon_composition_df.loc[:, column_order]
+
+        return exon_composition_df
+
+    def _cluster_reads(self, prefix=""):
+        """ Cluster reads based on their exon composition
+
+        :param prefix: The prefix to put for transcript cluster names
+        """
+
+        # Group by exon composition and create tuple of reads id corresponding to an exon composition
+        cluster_df = self.exon_composition_df.groupby(
+            self.exon_composition_df.columns.to_list()
+        ).apply(lambda x: tuple(x.index))
+        cluster_df = cluster_df.reset_index(name="read_ids")
+
+        cluster_df["frequency"] = cluster_df["read_ids"].apply(len)
+        cluster_df.sort_values("frequency", ascending=False, inplace=True)
+
+        cluster_df["index"] = [
+            f"{prefix}{n}" for n in range(1, cluster_df.index.size + 1)
+        ]
+        cluster_df.set_index("index", inplace=True)
+
+        return cluster_df
 
 
 class Transcripts(object):
