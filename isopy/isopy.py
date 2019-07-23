@@ -8,6 +8,7 @@ import numpy as np
 import subprocess
 import os
 import logging
+from natsort import natsorted
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -168,7 +169,7 @@ class Transcripts(object):
     """Representation of a set of transcripts. Transcripts are herein first defined by
     their exon_composition
 
-    :param exon_composition_matrix: An dataframe in Excel format with as index the transcripts IDs and as columns the exon names. IMPORTANT: The exons in columns should be ordered in order of appearance in the trancript !!
+    :param exon_composition_matrix: An dataframe in csv format with as index the transcripts IDs and as columns the exon names. IMPORTANT: The exons in columns should be ordered in order of appearance in the trancript !!
         
     :param exon_fasta: A fasta file with the sequence of each exons with IDs corresponding to the IDs in exon_composition_matrix
     """
@@ -188,6 +189,8 @@ class Transcripts(object):
         self.exon_bed.to_saf()
         self.junction_bed.to_saf()
 
+        self.junction_composition_df = self._build_junction_composition()
+
     def __repr__(self):
 
         # Since row are transcripts_id and columns exons
@@ -201,6 +204,39 @@ class Transcripts(object):
 
         exons = list(row[row == True].index)
         return exons
+
+    def _get_junctions(self, row):
+        """
+        Extract a string with all junctions (e.g 'E1_E2') separated by ','.
+        """
+        exons = list(row[row == True].index)
+        junctions = ",".join(
+            ["_".join(exons[i : i + 2]) for i in range(len(exons) - 1)]
+        )
+        return junctions
+
+    def _build_junction_composition(self):
+        """ Returns a DataFrame with summary information on the population of transcripts.
+        """
+
+        junctions = self.exon_composition_df.apply(self._get_junctions, axis=1)
+        junctions.index.name = "transcript_id"
+
+        # This produce the junction composition table
+        junctions_df = (
+            junctions.str.split(",", expand=True)
+            .stack()
+            .reset_index()
+            .pivot_table(index="transcript_id", columns=0, aggfunc="size")
+        ).fillna(0)
+
+        index_order = natsorted(list(junctions_df.index))
+        column_order = natsorted(list(junctions_df.columns))
+
+        junctions_df = junctions_df.loc[index_order, column_order]
+        junctions_df = junctions_df.astype(int)
+
+        return junctions_df
 
     def _build_fasta_bed_from_exon_composition(
         self, exon_fasta, fasta_out, exon_bed_out, junction_bed_out
