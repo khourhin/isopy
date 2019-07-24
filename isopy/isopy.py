@@ -169,20 +169,20 @@ class TranscriptCluster(object):
     """ Cluster long reads based on their exon composition. 
     
         :param exon_identifier_object: An ExonIdentifier object
-        :returns: 
-        :rtype: 
     """
 
     def __init__(self, exon_identifier_object, threads):
 
         self.exon_fas = exon_identifier_object.exon_fas_fn
         self.read_fas = exon_identifier_object.reads
+        self.out_dir = exon_identifier_object.out_dir
         self.threads = threads
 
         self._format_blast_db()
         self.blast_df = self._run_blast_versus_exons()
         self.exon_composition_df = self._get_exon_composition_from_blast()
         self.cluster_df = self._cluster_reads()
+        self.export()
 
     def __repr__(self):
 
@@ -195,16 +195,17 @@ class TranscriptCluster(object):
         blastdb_cmd = f"makeblastdb -dbtype nucl -in {self.exon_fas}"
         _exec_command(blastdb_cmd)
 
-    def _run_blast_versus_exons(self, out_file="blast_out.tab"):
+    def _run_blast_versus_exons(self):
         """ Execute blast of transcripts against exons identified by ExonIdentifier
         """
+        blast_out_fn = "blast_out.tab"
 
         blast_cmd = f"blastn -num_threads {self.threads} -outfmt 6 -task 'blastn-short' \
-        -evalue 0.001 -penalty -2 -query {self.read_fas} -db {self.exon_fas} > {out_file}"
+        -evalue 0.001 -penalty -2 -query {self.read_fas} -db {self.exon_fas} > {(self.out_dir / blast_out_fn)}"
 
         _exec_command(blast_cmd)
 
-        blast_df = pd.read_csv(out_file, sep="\t", header=None)
+        blast_df = pd.read_csv((self.out_dir / blast_out_fn), sep="\t", header=None)
         return blast_df
 
     def _get_exon_composition_from_blast(self, id_threshold=90):
@@ -217,10 +218,12 @@ class TranscriptCluster(object):
 
         column_order = natsorted(exon_composition_df.columns)
         exon_composition_df = exon_composition_df.loc[:, column_order]
+        exon_composition_df.index.name = "transcript_id"
+        exon_composition_df.columns.name = None
 
         return exon_composition_df
 
-    def _cluster_reads(self, prefix=""):
+    def _cluster_reads(self, prefix="alternative_transcript_"):
         """ Cluster reads based on their exon composition
 
         :param prefix: The prefix to put for transcript cluster names
@@ -241,6 +244,20 @@ class TranscriptCluster(object):
         cluster_df.set_index("index", inplace=True)
 
         return cluster_df
+
+    def export(self):
+        """ Export the results of the clustering to self.out_dir:
+        - Exon composition csv
+        - Reads clustered in various fasta file corresponding to their cluster name (transcript/isoform)
+        """
+
+        self.exon_composition_df.to_csv(self.out_dir / "exon_composition.csv")
+
+        for k, reads in self.cluster_df["read_ids"].iteritems():
+            with open(self.out_dir / f"{k}.fas", "w") as f:
+                for seq in Fasta(self.read_fas).parse():
+                    if seq.name_simple in reads:
+                        f.write(str(seq))
 
 
 class Transcripts(object):

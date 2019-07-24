@@ -5,6 +5,7 @@
 
 from easydev import md5
 from click.testing import CliRunner
+import pandas as pd
 
 from isopy.isopy import Transcripts, ExonIdentifier, TranscriptCluster
 from isopy import cli
@@ -63,4 +64,9 @@ def test_ExonIdentifier(tmpdir, datadir):
     # Test the TranscriptCluster object
 
     clusters = TranscriptCluster(exons, THREADS)
-    print(clusters.cluster_df)
+
+    # Test if exon initial and infered exon composition are the same
+    pd.testing.assert_frame_equal(
+        clusters.exon_composition_df,
+        pd.read_csv(datadir / "mock_exon_composition.csv", index_col=0),
+    )
