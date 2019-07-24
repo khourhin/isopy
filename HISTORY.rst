@@ -4,6 +4,18 @@
 History
 -------
 
+0.3.0 Implement clustering and results export [2/2]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+<2019-07-24 Wed>
+
+- ☑ Add TranscriptCluster object 
+
+  > Running Blast identification, exon composition detection and data export as
+  fasta and table.
+
+- ☑ Completing tests / docs
+
 0.2.0 Implement exon identification [3/3]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

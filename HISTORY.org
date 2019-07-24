@@ -34,16 +34,28 @@ names "altvX" with X refering to their place in alternative exons order by read 
   - Quantification by alignment to pseudo-transcriptome (downweight for multimappers), TMM norm.
 
 * History
+** DONE 0.3.0 Implement clustering and results export [2/2]
+   CLOSED: [2019-07-24 Wed 09:48] SCHEDULED: <2019-07-24 Wed>
+
+<2019-07-24 Wed>
+
+- [X] Add TranscriptCluster object 
+  
+  > Running Blast identification, exon composition detection and data export as
+  fasta and table.
+
+- [X] Completing tests / docs
+
 ** DONE 0.2.0 Implement exon identification [3/3]
    CLOSED: [2019-07-19 Fri 16:50] SCHEDULED: <2019-07-19 Fri>
 
 <2019-07-19 Fri>
 
-   - [X] Prepare test dataset
+- [X] Prepare test dataset
     
-     > Using GPHN gene and previously described 40 exons
+  > Using GPHN gene and previously described 40 exons
 
-   - [X] From multiple alignments of long reads against a genome, extract a list of putative exons as dataframe.
+- [X] From multiple alignments of long reads against a genome, extract a list of putative exons as dataframe.
 
-   - [X] Export exons to bed and fasta files
+- [X] Export exons to bed and fasta files
 
