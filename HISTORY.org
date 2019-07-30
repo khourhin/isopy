@@ -16,14 +16,17 @@ names "altvX" with X refering to their place in alternative exons order by read 
 
 * Next                                                             :noexport:
 
+- Deal with multiple fasta read files !
+
 - Verify how this is working and what would change with a gene on the - strand !!!
 
 - Deal with cryptic exons (especially at the time of naming exons in isopy.export_to_bed) 
 
+- See [[file:~/hub/allemand/gphn/gphn.org::*Final%20Workflow][Final Workflow]]
 
 - CORNERCASE: Adding chromsize to be sure to be in the bounderies of
   chromosomes when checking splicing sites
-
+  
 * TODO Biblio                                                      :noexport:
   SCHEDULED: <2019-08-01 Thu>
 
