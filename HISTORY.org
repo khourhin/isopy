@@ -35,7 +35,7 @@ names "altvX" with X refering to their place in alternative exons order by read 
   - Looking for inserts in read mapping against transcriptome
   - Candidate exons from the mapping to genome should be 6nt away from known exon
   - Quantification by alignment to pseudo-transcriptome (downweight for multimappers), TMM norm.
-
+    
 * History
 ** DONE 0.3.0 Implement clustering and results export [2/2]
    CLOSED: [2019-07-24 Wed 09:48] SCHEDULED: <2019-07-24 Wed>

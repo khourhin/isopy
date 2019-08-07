@@ -9,6 +9,7 @@ import subprocess
 import os
 import logging
 from natsort import natsorted
+from pathlib import Path
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -16,7 +17,7 @@ logger.setLevel(logging.DEBUG)
 # Number of basis in 5' and 3' of a junction to make it specific in our dataset
 OVERHANG_5 = 9
 OVERHANG_3 = 6
-OUT_DIR = "isopy_out"
+OUT_DIR = Path("isopy_out")
 
 
 def _exec_command(cmd, silent=False):
@@ -43,19 +44,20 @@ def _exec_command(cmd, silent=False):
 class ExonIdentifier(object):
     """ A tool to identify exons from long reads and a reference genome
 
-        :param reads_fas: Path to the fasta file with long reads.
+        :param read_files_fas: Path to the fasta files with long reads.
         :param genome_fas: Path to the fasta file of the genome to map to.
         :param out_dir: Path to the output directory.
         :param min_read_count: The minimum number of read supporting an exon for the the exon to be considered.
         """
 
-    def __init__(self, reads_fas, genome_fas, out_dir=OUT_DIR, min_read_count=0):
+    def __init__(self, read_files_fas, genome_fas, out_dir=OUT_DIR, min_read_count=0):
         self.genome = genome_fas
-        self.reads = reads_fas
+        self.read_files_fas = read_files_fas
         self.out_dir = out_dir
         os.makedirs(self.out_dir)
 
-        self.bam = self._map_reads_to_genome()
+        self.merged_bam = os.path.join(self.out_dir, "merged.bam")
+        self._map_reads_to_genome()
         self.exons_df = self._extract_raw_exons()
         self._filter_exons_by_canonical_splice_sites()
         self._filter_exons_by_read_support(min_read_count)
@@ -65,20 +67,29 @@ class ExonIdentifier(object):
     def _map_reads_to_genome(self):
         """ Map long reads to the genome. Using Minimap2.
         """
+        bams = []
 
-        bam = os.path.basename(os.path.splitext(self.reads)[0] + ".bam")
-        bam = os.path.join(self.out_dir, bam)
+        for read_file in self.read_files_fas:
 
-        minimap_cmd = f"minimap2 -ax splice -uf {self.genome} {self.reads} \
-        | samtools view -bh \
-        | samtools sort \
-        > {bam}"
+            bam = os.path.basename(os.path.splitext(read_file)[0] + ".bam")
+            bam = os.path.join(self.out_dir, bam)
 
-        logging.debug("Minimap2 START")
-        _exec_command(minimap_cmd)
-        logging.debug("Minimap2 DONE")
+            minimap_cmd = f"minimap2 -ax splice -uf {self.genome} {read_file} \
+            | samtools view -bh \
+            | samtools sort \
+            > {bam}"
 
-        return bam
+            logging.debug("Minimap2 START")
+            _exec_command(minimap_cmd)
+            logging.debug("Minimap2 DONE")
+
+            bams.append(bam)
+
+        samtools_merge_cmd = f"samtools merge {self.merged_bam} {' '.join(bams)}"
+
+        logging.debug("Samtools merge START")
+        _exec_command(samtools_merge_cmd)
+        logging.debug("Samtools merge DONE")
 
     def _extract_raw_exons(self):
         """ From the bam alignment, get a dataframe with the regions of putative exons
@@ -100,7 +111,7 @@ class ExonIdentifier(object):
 
         logging.debug("Raw exon extraction START")
         # Extract mapped intervals from the bam alignement file
-        exons_df = BedTool(self.bam).bam_to_bed(split=True).sort().to_dataframe()
+        exons_df = BedTool(self.merged_bam).bam_to_bed(split=True).sort().to_dataframe()
 
         # Keep only interval information
         exons_df = exons_df.loc[:, ["chrom", "start", "end"]]
@@ -168,14 +179,27 @@ class ExonIdentifier(object):
 class TranscriptCluster(object):
     """ Cluster long reads based on their exon composition. 
     
-        :param exon_identifier_object: An ExonIdentifier object
+    :param exon_fas: Path to the fasta file with the exon sequences
+    :param read_file_fas: Path to the fasta file with reads
+    :param out_dir: Path to the output directory
+    :param threads: Number of threads to use
     """
 
-    def __init__(self, exon_identifier_object, threads):
+    def __init__(
+        self, exon_fas, read_file_fas, out_dir=OUT_DIR, prefix=None, threads=1
+    ):
 
-        self.exon_fas = exon_identifier_object.exon_fas_fn
-        self.read_fas = exon_identifier_object.reads
-        self.out_dir = exon_identifier_object.out_dir
+        self.exon_fas = exon_fas
+        self.read_fas = read_file_fas
+        self.out_dir = out_dir
+
+        if prefix:
+            self.prefix = prefix
+        else:
+            self.prefix = os.path.splitext(os.path.basename(read_file_fas))[0]
+
+        print(self.prefix)
+
         self.threads = threads
 
         self._format_blast_db()
@@ -251,10 +275,12 @@ class TranscriptCluster(object):
         - Reads clustered in various fasta file corresponding to their cluster name (transcript/isoform)
         """
 
-        self.exon_composition_df.to_csv(self.out_dir / "exon_composition.csv")
+        self.exon_composition_df.to_csv(
+            self.out_dir / f"{self.prefix}_exon_composition.csv"
+        )
 
         for k, reads in self.cluster_df["read_ids"].iteritems():
-            with open(self.out_dir / f"{k}.fas", "w") as f:
+            with open(self.out_dir / f"{self.prefix}_{k}.fas", "w") as f:
                 for seq in Fasta(self.read_fas).parse():
                     if seq.name_simple in reads:
                         f.write(str(seq))

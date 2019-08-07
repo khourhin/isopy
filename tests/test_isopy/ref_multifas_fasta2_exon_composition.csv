@@ -1,0 +1,4 @@
+transcript_id,E1,E2,E3,E4
+f2_transcript_1,True,True,True,True
+f2_transcript_3,True,False,True,True
+f2_transcript_4,True,False,False,True
