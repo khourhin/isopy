@@ -44,9 +44,7 @@ def _exec_command(cmd, silent=False):
 def build_fasta_bed_from_exon_composition(
     exon_fas, cluster_df, fasta_out, exon_bed_out, junction_bed_out
 ):
-    """Build the sequence exon by exon depending on the exon_composition_matrix and
-
-    :param fasta_out: Path to recomposed transcripts fasta file.
+    """ Build fasta and bed files with pseudo-transcripts. These pseudo-transcript are obtained by a concatenation of the exon sequences (found in exon_fas) following an exon composition matrix (cluster_df)
     """
 
     def _get_exons(row):
@@ -111,6 +109,42 @@ def build_fasta_bed_from_exon_composition(
     return exon_bed, junction_bed, fasta_out
 
 
+class IsoAnalysis(object):
+    """ The complete isopy alternative splicing analysis
+    """
+
+    def __init__(
+        self, read_files_fas, genome_fas, out_dir=OUT_DIR, min_read_count=0, threads=1
+    ):
+
+        self.out_dir = Path(out_dir)
+
+        self.exons = ExonIdentifier(
+            read_files_fas,
+            genome_fas,
+            out_dir=self.out_dir,
+            min_read_count=min_read_count,
+        )
+        self.clusters = TranscriptCluster(
+            self.exons.exon_fas_fn, read_files_fas, out_dir=self.out_dir
+        )
+        build_fasta_bed_from_exon_composition(
+            self.exons.exon_fas_fn,
+            self.clusters.cluster_df,
+            "test.fas",
+            "exons.bed",
+            "junctions.bed",
+        )
+
+        self.exons_df = self.exons.exons_df
+        self.clusters_df = self.clusters.cluster_df
+        self.exons_composition_df = self.clusters.exon_composition_df
+        self.junction_pseudotrans = self.clusters.junction_pseudtrans
+        self.junction_libraries = self.clusters.junction_libraries
+
+        self.blast_df = self.clusters.blast_df
+
+
 class ExonIdentifier(object):
     """ A tool to identify exons from long reads and a reference genome
 
@@ -120,13 +154,13 @@ class ExonIdentifier(object):
         :param min_read_count: The minimum number of read supporting an exon for the the exon to be considered.
         """
 
-    def __init__(self, read_files_fas, genome_fas, out_dir=OUT_DIR, min_read_count=0):
+    def __init__(self, read_files_fas, genome_fas, out_dir, min_read_count=0):
         self.genome = genome_fas
         self.read_files_fas = read_files_fas
-        self.out_dir = out_dir
+        self.out_dir = Path(out_dir)
         os.makedirs(self.out_dir)
 
-        self.merged_bam = os.path.join(self.out_dir, "merged.bam")
+        self.merged_bam = self.out_dir / "merged.bam"
         self._map_reads_to_genome()
         self.exons_df = self._extract_raw_exons()
         self._filter_exons_by_canonical_splice_sites()
@@ -142,7 +176,7 @@ class ExonIdentifier(object):
         for read_file in self.read_files_fas:
 
             bam = os.path.basename(os.path.splitext(read_file)[0] + ".bam")
-            bam = os.path.join(self.out_dir, bam)
+            bam = self.out_dir / bam
 
             minimap_cmd = f"minimap2 -ax splice -uf {self.genome} {read_file} \
             | samtools view -bh \
@@ -153,7 +187,7 @@ class ExonIdentifier(object):
             _exec_command(minimap_cmd)
             logging.debug("Minimap2 DONE")
 
-            bams.append(bam)
+            bams.append(str(bam))
 
         samtools_merge_cmd = f"samtools merge {self.merged_bam} {' '.join(bams)}"
 
@@ -181,7 +215,9 @@ class ExonIdentifier(object):
 
         logging.debug("Raw exon extraction START")
         # Extract mapped intervals from the bam alignement file
-        exons_df = BedTool(self.merged_bam).bam_to_bed(split=True).sort().to_dataframe()
+        exons_df = (
+            BedTool(str(self.merged_bam)).bam_to_bed(split=True).sort().to_dataframe()
+        )
 
         # Keep only interval information
         exons_df = exons_df.loc[:, ["chrom", "start", "end"]]
@@ -269,7 +305,8 @@ class TranscriptCluster(object):
         self.blast_df = self._run_blast_versus_exons()
         self.exon_composition_df = self._get_exon_composition_from_blast()
         self.cluster_df = self._cluster_reads()
-        self.junction_composition_df = self._get_junction_composition()
+        self.junction_pseudtrans = self._get_junction_composition(all_reads=False)
+        self.junction_libraries = self._get_junction_composition(all_reads=True)
         # self.export()
 
     def __repr__(self):
@@ -373,21 +410,31 @@ class TranscriptCluster(object):
         )
         return junctions
 
-    def _get_junction_composition(self):
+    def _get_junction_composition(self, all_reads=True):
         """ Returns a DataFrame with summary information on the population of transcripts.
         """
 
-        junctions = self.cluster_df.drop(["read_ids", "frequency"], axis=1).apply(
-            self._get_junctions, axis=1
-        )
+        if all_reads:
+            junctions = self.exon_composition_df.apply(self._get_junctions, axis=1)
+            # This produce the junction composition table
+            junctions_df = (
+                junctions.str.split(",", expand=True)
+                .stack()
+                .reset_index()
+                .pivot_table(index=["library", "query"], columns=0, aggfunc="size")
+            ).fillna(0)
 
-        # This produce the junction composition table
-        junctions_df = (
-            junctions.str.split(",", expand=True)
-            .stack()
-            .reset_index()
-            .pivot_table(index="transcript_id", columns=0, aggfunc="size")
-        ).fillna(0)
+        else:
+            junctions = self.cluster_df.drop(["read_ids", "frequency"], axis=1).apply(
+                self._get_junctions, axis=1
+            )
+            # This produce the junction composition table
+            junctions_df = (
+                junctions.str.split(",", expand=True)
+                .stack()
+                .reset_index()
+                .pivot_table(index="transcript_id", columns=0, aggfunc="size")
+            ).fillna(0)
 
         index_order = natsorted(list(junctions_df.index))
         column_order = natsorted(list(junctions_df.columns))
