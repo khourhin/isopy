@@ -7,7 +7,7 @@ from easydev import md5
 from click.testing import CliRunner
 import pandas as pd
 
-from isopy.isopy import Transcripts, ExonIdentifier, TranscriptCluster
+import isopy.isopy as iso
 from isopy import cli
 
 THREADS = 4
@@ -28,50 +28,38 @@ def test_Transcripts(tmpdir, datadir):
     """ Test the Transcripts object
     """
 
-    transcripts = Transcripts(
-        (datadir / "mock_exon_composition.csv"),
+    exon_bed, junction_bed, fasta_out = iso.build_fasta_bed_from_exon_composition(
         (datadir / "mock_exons.fas"),
+        pd.read_csv(datadir / "mock_exon_composition.csv", index_col=0),
         fasta_out=(tmpdir / "mock_transcripts.fas"),
         exon_bed_out=(tmpdir / "mock_exons.bed"),
         junction_bed_out=(tmpdir / "mock_junctions.bed"),
     )
 
-    assert md5(transcripts.fasta) == md5(datadir / "ref_mock_transcripts.fas")
-    assert md5(transcripts.exon_bed.path) == md5(datadir / "ref_mock_exons.bed")
-    assert md5(transcripts.junction_bed.path) == md5(datadir / "ref_mock_junctions.bed")
+    assert md5(fasta_out) == md5(datadir / "ref_mock_transcripts.fas")
+    assert md5(exon_bed.path) == md5(datadir / "ref_mock_exons.bed")
+    assert md5(junction_bed.path) == md5(datadir / "ref_mock_junctions.bed")
 
 
 def test_ExonIdentifier(tmpdir, datadir):
     """ Test the ExonIdentifier object
     """
-    transcripts = Transcripts(
-        (datadir / "mock_exon_composition.csv"),
+    exon_bed, junction_bed, fasta_out = iso.build_fasta_bed_from_exon_composition(
         (datadir / "mock_exons.fas"),
+        pd.read_csv(datadir / "mock_exon_composition.csv", index_col=0),
         fasta_out=(tmpdir / "mock_transcripts.fasta"),
         exon_bed_out=(tmpdir / "mock_exons.bed"),
         junction_bed_out=(tmpdir / "mock_junction.bed"),
     )
 
-    exons = ExonIdentifier(
-        read_files_fas=[transcripts.fasta],
+    exons = iso.ExonIdentifier(
+        read_files_fas=[fasta_out],
         # Has to be converted to str for bedtools to use it properly for chromSizes
         genome_fas=str(datadir / "mock_genome.fas"),
         out_dir=(tmpdir / "ali"),
     )
 
     assert md5(datadir / "mock_exons.fas") == md5(exons.exon_fas_fn)
-
-    # Test the TranscriptCluster object
-
-    clusters = TranscriptCluster(
-        exons.exon_fas_fn, (tmpdir / "mock_transcripts.fasta"), exons.out_dir, THREADS
-    )
-
-    # Test if exon initial and infered exon composition are the same
-    pd.testing.assert_frame_equal(
-        clusters.exon_composition_df,
-        pd.read_csv(datadir / "mock_exon_composition.csv", index_col=0),
-    )
 
 
 def test_multi_fasta(tmpdir, datadir):
@@ -83,21 +71,41 @@ def test_multi_fasta(tmpdir, datadir):
         (datadir / "mock_multi_fasta_2.fas"),
     ]
 
-    exons = ExonIdentifier(
+    exons = iso.ExonIdentifier(
         read_files_fas=fastas,
         genome_fas=str(datadir / "mock_genome.fas"),
         out_dir=(tmpdir / "ali_multifasta"),
     )
 
-    clusters_1 = TranscriptCluster(exons.exon_fas_fn, fastas[0], out_dir=tmpdir)
-    clusters_2 = TranscriptCluster(exons.exon_fas_fn, fastas[1], out_dir=tmpdir)
+    clusters_1 = iso.TranscriptCluster(exons.exon_fas_fn, [fastas[0]], out_dir=tmpdir)
+    clusters_2 = iso.TranscriptCluster(exons.exon_fas_fn, [fastas[1]], out_dir=tmpdir)
 
-    pd.testing.assert_frame_equal(
-        clusters_1.exon_composition_df,
-        pd.read_csv(datadir / "ref_multifas_fasta1_exon_composition.csv", index_col=0),
+    # Formatting necessary to get correct index and index names
+    cluster_1_ref = pd.read_csv(
+        datadir / "ref_multifas_fasta1_exon_composition.csv",
+        index_col=["library", "query"],
     )
 
-    pd.testing.assert_frame_equal(
-        clusters_2.exon_composition_df,
-        pd.read_csv(datadir / "ref_multifas_fasta2_exon_composition.csv", index_col=0),
+    cluster_1_ref.rename_axis(["subject"], axis=1, inplace=True)
+
+    pd.testing.assert_frame_equal(clusters_1.exon_composition_df, cluster_1_ref)
+
+    # Formatting necessary to get correct index and index names
+    cluster_2_ref = pd.read_csv(
+        datadir / "ref_multifas_fasta2_exon_composition.csv",
+        index_col=["library", "query"],
     )
+    cluster_2_ref.rename_axis(["subject"], axis=1, inplace=True)
+
+    pd.testing.assert_frame_equal(clusters_2.exon_composition_df, cluster_2_ref)
+
+    cluster_all = iso.TranscriptCluster(exons.exon_fas_fn, fastas, out_dir=tmpdir)
+
+    cluster_all_ref = pd.read_csv(
+        datadir / "ref_multifas_fasta_all_exon_composition.csv",
+        index_col=["library", "query"],
+    )
+
+    cluster_all_ref.rename_axis(["subject"], axis=1, inplace=True)
+
+    pd.testing.assert_frame_equal(cluster_all.exon_composition_df, cluster_all_ref)

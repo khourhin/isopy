@@ -1,4 +1,6 @@
 library,query,E1,E2,E3,E4
+mock_multi_fasta_1.fas,f1_transcript_1,True,True,True,True
+mock_multi_fasta_1.fas,f1_transcript_2,True,True,False,True
 mock_multi_fasta_2.fas,f2_transcript_1,True,True,True,True
 mock_multi_fasta_2.fas,f2_transcript_3,True,False,True,True
 mock_multi_fasta_2.fas,f2_transcript_4,True,False,False,True

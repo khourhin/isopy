@@ -315,7 +315,7 @@ class TranscriptCluster(object):
             blast_df = pd.read_csv(
                 (self.out_dir / blast_out_fn), sep="\t", names=fields
             )
-            blast_df.loc[:, "library"] = fasta
+            blast_df.loc[:, "library"] = os.path.basename(fasta)
 
             blast_dfs.append(blast_df)
 
@@ -333,13 +333,11 @@ class TranscriptCluster(object):
                 columns="subject",
                 index=["library", "query"],
             )
-            > 90
+            > id_threshold
         )
 
         column_order = natsorted(exon_composition_df.columns)
         exon_composition_df = exon_composition_df.loc[:, column_order]
-        exon_composition_df.index.name = "transcript_id"
-        exon_composition_df.columns.name = None
 
         return exon_composition_df
 
