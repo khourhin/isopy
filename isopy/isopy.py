@@ -269,7 +269,7 @@ class TranscriptCluster(object):
         self.blast_df = self._run_blast_versus_exons()
         self.exon_composition_df = self._get_exon_composition_from_blast()
         self.cluster_df = self._cluster_reads()
-        self.junction_df = self._get_junction_composition()
+        self.junction_composition_df = self._get_junction_composition()
         # self.export()
 
     def __repr__(self):
