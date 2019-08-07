@@ -41,10 +41,80 @@ def _exec_command(cmd, silent=False):
         raise ChildProcessError(exc.stderr)
 
 
+def build_fasta_bed_from_exon_composition(
+    exon_fas, cluster_df, fasta_out, exon_bed_out, junction_bed_out
+):
+    """Build the sequence exon by exon depending on the exon_composition_matrix and
+
+    :param fasta_out: Path to recomposed transcripts fasta file.
+    """
+
+    def _get_exons(row):
+        """
+        Extract a list of exons from a line of the exon composition matrix
+        """
+
+        exons = list(row[row == True].index)
+        return exons
+
+    transcript_exon_list = cluster_df.drop(["read_ids", "frequency"], axis=1).apply(
+        _get_exons, axis=1
+    )
+    exon_seqs = Fasta(exon_fas).to_dict()
+
+    seq_dict = {}
+
+    exon_bed_df = pd.DataFrame()
+    junction_bed_df = pd.DataFrame()
+
+    for transcript_id, exon_compo in transcript_exon_list.iteritems():
+        seq_dict[transcript_id] = "".join(
+            [exon_seqs[exon_id] for exon_id in exon_compo]
+        )
+
+        # Define exon intervals on transcripts, using length of each exons summed
+        exon_annot = pd.DataFrame(
+            {
+                "chr": [transcript_id for _ in exon_compo],
+                "start": [0]
+                + list(
+                    np.cumsum([len(exon_seqs[exon_id]) for exon_id in exon_compo])[:-1]
+                ),
+                "end": np.cumsum([len(exon_seqs[exon_id]) for exon_id in exon_compo]),
+                "name": [exon_id for exon_id in exon_compo],
+                "score": "0",
+                "strand": ".",
+            }
+        )
+
+        junction_annot = exon_annot.copy()
+        junction_annot.end = junction_annot.start + OVERHANG_3
+        junction_annot.start = junction_annot.start - OVERHANG_5
+        junction_names = [
+            f"junction_{exon_1}_{exon_2}"
+            for exon_1, exon_2 in zip(junction_annot.name[:-1], junction_annot.name[1:])
+        ]
+        junction_annot = junction_annot[1:]
+        junction_annot.name = junction_names
+
+        # Build iteratively the bed formatted annotation table
+        exon_bed_df = pd.concat([exon_bed_df, exon_annot], axis=0)
+        junction_bed_df = pd.concat([junction_bed_df, junction_annot], axis=0)
+
+    exon_bed = bed.df_to_bed(exon_bed_df, exon_bed_out)
+    junction_bed = bed.df_to_bed(junction_bed_df, junction_bed_out)
+
+    with open(fasta_out, "w") as f:
+        for transcript in seq_dict:
+            f.write(f">{transcript}\n{seq_dict[transcript]}\n")
+
+    return exon_bed, junction_bed, fasta_out
+
+
 class ExonIdentifier(object):
     """ A tool to identify exons from long reads and a reference genome
 
-        :param read_files_fas: Path to the fasta files with long reads.
+        :param read_files_fas: List of paths to the fasta files with long reads.
         :param genome_fas: Path to the fasta file of the genome to map to.
         :param out_dir: Path to the output directory.
         :param min_read_count: The minimum number of read supporting an exon for the the exon to be considered.
@@ -180,25 +250,18 @@ class TranscriptCluster(object):
     """ Cluster long reads based on their exon composition. 
     
     :param exon_fas: Path to the fasta file with the exon sequences
-    :param read_file_fas: Path to the fasta file with reads
+    :param read_files_fas: List of path to the fasta files with reads
     :param out_dir: Path to the output directory
     :param threads: Number of threads to use
     """
 
     def __init__(
-        self, exon_fas, read_file_fas, out_dir=OUT_DIR, prefix=None, threads=1
+        self, exon_fas, read_files_fas, out_dir=OUT_DIR, prefix=None, threads=1
     ):
 
         self.exon_fas = exon_fas
-        self.read_fas = read_file_fas
+        self.read_files_fas = read_files_fas
         self.out_dir = out_dir
-
-        if prefix:
-            self.prefix = prefix
-        else:
-            self.prefix = os.path.splitext(os.path.basename(read_file_fas))[0]
-
-        print(self.prefix)
 
         self.threads = threads
 
@@ -206,7 +269,8 @@ class TranscriptCluster(object):
         self.blast_df = self._run_blast_versus_exons()
         self.exon_composition_df = self._get_exon_composition_from_blast()
         self.cluster_df = self._cluster_reads()
-        self.export()
+        self.junction_df = self._get_junction_composition()
+        # self.export()
 
     def __repr__(self):
 
@@ -222,14 +286,40 @@ class TranscriptCluster(object):
     def _run_blast_versus_exons(self):
         """ Execute blast of transcripts against exons identified by ExonIdentifier
         """
+
+        blast_dfs = []
         blast_out_fn = "blast_out.tab"
 
-        blast_cmd = f"blastn -num_threads {self.threads} -outfmt 6 -task 'blastn-short' \
-        -evalue 0.001 -penalty -2 -query {self.read_fas} -db {self.exon_fas} > {(self.out_dir / blast_out_fn)}"
+        for fasta in self.read_files_fas:
 
-        _exec_command(blast_cmd)
+            blast_cmd = f"blastn -num_threads {self.threads} -outfmt 6 -task 'blastn-short' \
+            -evalue 0.001 -penalty -2 -query {fasta} -db {self.exon_fas} > {(self.out_dir / blast_out_fn)}"
 
-        blast_df = pd.read_csv((self.out_dir / blast_out_fn), sep="\t", header=None)
+            _exec_command(blast_cmd)
+
+            fields = [
+                "query",
+                "subject",
+                "identity",
+                "alignment_length",
+                "mismatches",
+                "gap_opens",
+                "query_start",
+                "query_end",
+                "subject_start",
+                "subject_end",
+                "evalue",
+                "bit_score",
+            ]
+
+            blast_df = pd.read_csv(
+                (self.out_dir / blast_out_fn), sep="\t", names=fields
+            )
+            blast_df.loc[:, "library"] = fasta
+
+            blast_dfs.append(blast_df)
+
+        blast_df = pd.concat(blast_dfs)
         return blast_df
 
     def _get_exon_composition_from_blast(self, id_threshold=90):
@@ -237,7 +327,13 @@ class TranscriptCluster(object):
         """
 
         exon_composition_df = (
-            pd.pivot_table(self.blast_df, values=2, columns=1, index=0) > 90
+            pd.pivot_table(
+                self.blast_df,
+                values="identity",
+                columns="subject",
+                index=["library", "query"],
+            )
+            > 90
         )
 
         column_order = natsorted(exon_composition_df.columns)
@@ -262,69 +358,12 @@ class TranscriptCluster(object):
         cluster_df["frequency"] = cluster_df["read_ids"].apply(len)
         cluster_df.sort_values("frequency", ascending=False, inplace=True)
 
-        cluster_df["index"] = [
+        cluster_df["transcript_id"] = [
             f"{prefix}{n}" for n in range(1, cluster_df.index.size + 1)
         ]
-        cluster_df.set_index("index", inplace=True)
+        cluster_df.set_index("transcript_id", inplace=True)
 
         return cluster_df
-
-    def export(self):
-        """ Export the results of the clustering to self.out_dir:
-        - Exon composition csv
-        - Reads clustered in various fasta file corresponding to their cluster name (transcript/isoform)
-        """
-
-        self.exon_composition_df.to_csv(
-            self.out_dir / f"{self.prefix}_exon_composition.csv"
-        )
-
-        for k, reads in self.cluster_df["read_ids"].iteritems():
-            with open(self.out_dir / f"{self.prefix}_{k}.fas", "w") as f:
-                for seq in Fasta(self.read_fas).parse():
-                    if seq.name_simple in reads:
-                        f.write(str(seq))
-
-
-class Transcripts(object):
-    """Representation of a set of transcripts. Transcripts are herein first defined by
-    their exon_composition
-
-    :param exon_composition_matrix: An dataframe in csv format with as index the transcripts IDs and as columns the exon names. IMPORTANT: The exons in columns should be ordered in order of appearance in the trancript !!
-        
-    :param exon_fasta: A fasta file with the sequence of each exons with IDs corresponding to the IDs in exon_composition_matrix
-    """
-
-    def __init__(
-        self,
-        exon_composition_csv,
-        exon_fasta,
-        fasta_out="artificial_transcripts.fas",
-        exon_bed_out="artificial_transcripts_exons.bed",
-        junction_bed_out="artificial_transcripts_junctions.bed",
-    ):
-        self.exon_composition_df = pd.read_csv(exon_composition_csv, index_col=0)
-        self.exon_bed, self.junction_bed, self.fasta = self._build_fasta_bed_from_exon_composition(
-            exon_fasta, fasta_out, exon_bed_out, junction_bed_out
-        )
-        self.exon_bed.to_saf()
-        self.junction_bed.to_saf()
-
-        self.junction_composition_df = self._build_junction_composition()
-
-    def __repr__(self):
-
-        # Since row are transcripts_id and columns exons
-        n_transcripts, n_exons = self.exon_composition_df.shape
-        return f"<Collection Object of {n_transcripts} transcripts with {n_exons} potential exons>"
-
-    def _get_exons(self, row):
-        """
-        Extract a list of exons from a line of the exon composition matrix
-        """
-
-        exons = list(row[row == True].index)
-        return exons
 
     def _get_junctions(self, row):
         """
@@ -336,12 +375,13 @@ class Transcripts(object):
         )
         return junctions
 
-    def _build_junction_composition(self):
+    def _get_junction_composition(self):
         """ Returns a DataFrame with summary information on the population of transcripts.
         """
 
-        junctions = self.exon_composition_df.apply(self._get_junctions, axis=1)
-        junctions.index.name = "transcript_id"
+        junctions = self.cluster_df.drop(["read_ids", "frequency"], axis=1).apply(
+            self._get_junctions, axis=1
+        )
 
         # This produce the junction composition table
         junctions_df = (
@@ -359,67 +399,16 @@ class Transcripts(object):
 
         return junctions_df
 
-    def _build_fasta_bed_from_exon_composition(
-        self, exon_fasta, fasta_out, exon_bed_out, junction_bed_out
-    ):
-        """Build the sequence exon by exon depending on the exon_composition_matrix and
-
-        :param exon_fasta: Path to the fasta file with exon nucleotide sequence.
-        :param fasta_out: Path to recomposed transcripts fasta file.
+    def export(self):
+        """ Export the results of the clustering to self.out_dir:
+        - Exon composition csv
+        - Reads clustered in various fasta file corresponding to their cluster name (transcript/isoform)
         """
-        transcript_exon_list = self.exon_composition_df.apply(self._get_exons, axis=1)
-        exon_seqs = Fasta(exon_fasta).to_dict()
 
-        seq_dict = {}
+        self.exon_composition_df.to_csv(self.out_dir / f"exon_composition.csv")
 
-        exon_bed_df = pd.DataFrame()
-        junction_bed_df = pd.DataFrame()
-
-        for transcript_id, exon_compo in transcript_exon_list.iteritems():
-            seq_dict[transcript_id] = "".join(
-                [exon_seqs[exon_id] for exon_id in exon_compo]
-            )
-
-            # Define exon intervals on transcripts, using length of each exons summed
-            exon_annot = pd.DataFrame(
-                {
-                    "chr": [transcript_id for _ in exon_compo],
-                    "start": [0]
-                    + list(
-                        np.cumsum([len(exon_seqs[exon_id]) for exon_id in exon_compo])[
-                            :-1
-                        ]
-                    ),
-                    "end": np.cumsum(
-                        [len(exon_seqs[exon_id]) for exon_id in exon_compo]
-                    ),
-                    "name": [exon_id for exon_id in exon_compo],
-                    "score": "0",
-                    "strand": ".",
-                }
-            )
-
-            junction_annot = exon_annot.copy()
-            junction_annot.end = junction_annot.start + OVERHANG_3
-            junction_annot.start = junction_annot.start - OVERHANG_5
-            junction_names = [
-                f"junction_{exon_1}_{exon_2}"
-                for exon_1, exon_2 in zip(
-                    junction_annot.name[:-1], junction_annot.name[1:]
-                )
-            ]
-            junction_annot = junction_annot[1:]
-            junction_annot.name = junction_names
-
-            # Build iteratively the bed formatted annotation table
-            exon_bed_df = pd.concat([exon_bed_df, exon_annot], axis=0)
-            junction_bed_df = pd.concat([junction_bed_df, junction_annot], axis=0)
-
-        exon_bed = bed.df_to_bed(exon_bed_df, exon_bed_out)
-        junction_bed = bed.df_to_bed(junction_bed_df, junction_bed_out)
-
-        with open(fasta_out, "w") as f:
-            for transcript in seq_dict:
-                f.write(f">{transcript}\n{seq_dict[transcript]}\n")
-
-        return exon_bed, junction_bed, fasta_out
+        # for k, reads in self.cluster_df["read_ids"].iteritems():
+        #     with open(self.out_dir / f"{k}.fas", "w") as f:
+        #         for seq in Fasta(self.read_files_fas).parse():
+        #             if seq.name_simple in reads:
+        #                 f.write(str(seq))
