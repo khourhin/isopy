@@ -109,3 +109,27 @@ def test_multi_fasta(tmpdir, datadir):
     cluster_all_ref.rename_axis(["subject"], axis=1, inplace=True)
 
     pd.testing.assert_frame_equal(cluster_all.exon_composition_df, cluster_all_ref)
+
+
+def test_IsoAnalysis(tmpdir, datadir):
+    """ Test the whole pipeline IsoAnalysis
+
+    TOFIX So far only check the IsoAnalysis.read_transcript_key table
+    """
+
+    fastas = [
+        (datadir / "mock_multi_fasta_1.fas"),
+        (datadir / "mock_multi_fasta_2.fas"),
+        (datadir / "mock_multi_fasta_3.fas"),
+    ]
+
+    genome_fas = str(datadir / "mock_genome.fas")
+
+    isoseq = iso.IsoAnalysis(fastas, genome_fas, out_dir=(tmpdir / "isopy_out"))
+
+    pd.testing.assert_frame_equal(
+        isoseq.read_transcript_key,
+        pd.read_csv(
+            datadir / "ref_read_transcript_key.csv", index_col=["library", "read_id"]
+        ),
+    )
