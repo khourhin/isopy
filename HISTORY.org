@@ -14,13 +14,11 @@ exons can overlap but have no common start nor end))
 The main exon is the one most supported by reads. The alternative one are
 names "altvX" with X refering to their place in alternative exons order by read support.
 
+- Deal with cryptic exons (especially at the time of naming exons in isopy.export_to_bed) 
+
 * Next                                                             :noexport:
 
-- Deal with multiple fasta read files !
-
 - Verify how this is working and what would change with a gene on the - strand !!!
-
-- Deal with cryptic exons (especially at the time of naming exons in isopy.export_to_bed) 
 
 - See [[file:~/hub/allemand/gphn/gphn.org::*Final%20Workflow][Final Workflow]]
 
@@ -37,6 +35,17 @@ names "altvX" with X refering to their place in alternative exons order by read 
   - Quantification by alignment to pseudo-transcriptome (downweight for multimappers), TMM norm.
     
 * History
+** TODO 0.4.0 Implement multiple fasta [3/4]
+   SCHEDULED: <2019-08-16 Fri>
+
+- [X] Allow for multiple fasta files input and keep library information
+
+- [X] Simplify interface and create scripts
+
+- [ ] Implement cryptic exons
+
+- [X] Export all tables to csv
+
 ** DONE 0.3.0 Implement clustering and results export [2/2]
    CLOSED: [2019-07-24 Wed 09:48] SCHEDULED: <2019-07-24 Wed>
 

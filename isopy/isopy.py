@@ -136,11 +136,17 @@ class IsoAnalysis(object):
         )
 
         self.exons_df = self.exons.exons_df
+        self.exons_df.to_csv(out_dir / "exons.csv")
         self.clusters_df = self.clusters.cluster_df
+        self.clusters_df.to_csv(out_dir / "clusters.csv")
         self.exons_composition_df = self.clusters.exon_composition_df
-        self.junction_pseudotrans = self.clusters.junction_pseudtrans
+        self.exons_composition_df.to_csv(out_dir / "exons_composition.csv")
+        self.junction_pseudotrans = self.clusters.junction_pseudotrans
+        self.junction_pseudotrans.to_csv(out_dir / "junction_pseudotrans.csv")
         self.junction_libraries = self.clusters.junction_libraries
+        self.junction_libraries.to_csv(out_dir / "junction_libraries.csv")
         self.read_transcript_key = self.clusters.read_transcript_key
+        self.read_transcript_key.to_csv(out_dir / "read_transcript_key.csv")
 
         self.blast_df = self.clusters.blast_df
 
@@ -303,7 +309,7 @@ class TranscriptCluster(object):
         self.blast_df = self._run_blast_versus_exons()
         self.exon_composition_df = self._get_exon_composition_from_blast()
         self.cluster_df = self._cluster_reads()
-        self.junction_pseudtrans = self._get_junction_composition(libraries=False)
+        self.junction_pseudotrans = self._get_junction_composition(libraries=False)
         self.junction_libraries = self._get_junction_composition(libraries=True)
         self.read_transcript_key = self._get_correspondance_read_transcript()
         # self.export()
