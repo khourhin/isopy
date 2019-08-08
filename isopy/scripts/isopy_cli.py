@@ -15,20 +15,25 @@ def parse_arguments():
         "-g", "--genome_fas", help="Path to the fasta genome file to map to"
     )
     parser.add_argument(
-        "-o", "--out_dir", help="Path to the output directory (which will be created)"
+        "-o",
+        "--out_dir",
+        help="Path to the output directory (which will be created)",
+        default="isopy_out",
     )
     parser.add_argument(
         "-m",
         "--min_read_count",
         help="Minimum number of long reads which supports an exon to consider this exon",
+        default=0,
     )
-    parser.add_argument("-t", "--threads", help="Number of threads to use")
+    parser.add_argument("-t", "--threads", help="Number of threads to use", default=1)
 
     return parser.parse_args()
 
 
 def main():
 
+    print("ah")
     args = parse_arguments()
 
     isoseq = iso.IsoAnalysis(

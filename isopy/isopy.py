@@ -17,7 +17,6 @@ logger.setLevel(logging.DEBUG)
 # Number of basis in 5' and 3' of a junction to make it specific in our dataset
 OVERHANG_5 = 9
 OVERHANG_3 = 6
-OUT_DIR = Path("isopy_out")
 
 
 def _exec_command(cmd, silent=False):
@@ -114,7 +113,7 @@ class IsoAnalysis(object):
     """
 
     def __init__(
-        self, read_files_fas, genome_fas, out_dir=OUT_DIR, min_read_count=0, threads=1
+        self, read_files_fas, genome_fas, out_dir, min_read_count=0, threads=1
     ):
 
         self.out_dir = Path(out_dir)
@@ -292,9 +291,7 @@ class TranscriptCluster(object):
     :param threads: Number of threads to use
     """
 
-    def __init__(
-        self, exon_fas, read_files_fas, out_dir=OUT_DIR, prefix=None, threads=1
-    ):
+    def __init__(self, exon_fas, read_files_fas, out_dir, prefix=None, threads=1):
 
         self.exon_fas = exon_fas
         self.read_files_fas = read_files_fas
