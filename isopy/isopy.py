@@ -136,17 +136,17 @@ class IsoAnalysis(object):
         )
 
         self.exons_df = self.exons.exons_df
-        self.exons_df.to_csv(out_dir / "exons.csv")
+        self.exons_df.to_csv(self.out_dir / "exons.csv")
         self.clusters_df = self.clusters.cluster_df
-        self.clusters_df.to_csv(out_dir / "clusters.csv")
+        self.clusters_df.to_csv(self.out_dir / "clusters.csv")
         self.exons_composition_df = self.clusters.exon_composition_df
-        self.exons_composition_df.to_csv(out_dir / "exons_composition.csv")
+        self.exons_composition_df.to_csv(self.out_dir / "exons_composition.csv")
         self.junction_pseudotrans = self.clusters.junction_pseudotrans
-        self.junction_pseudotrans.to_csv(out_dir / "junction_pseudotrans.csv")
+        self.junction_pseudotrans.to_csv(self.out_dir / "junction_pseudotrans.csv")
         self.junction_libraries = self.clusters.junction_libraries
-        self.junction_libraries.to_csv(out_dir / "junction_libraries.csv")
+        self.junction_libraries.to_csv(self.out_dir / "junction_libraries.csv")
         self.read_transcript_key = self.clusters.read_transcript_key
-        self.read_transcript_key.to_csv(out_dir / "read_transcript_key.csv")
+        self.read_transcript_key.to_csv(self.out_dir / "read_transcript_key.csv")
 
         self.blast_df = self.clusters.blast_df
 
