@@ -141,6 +141,7 @@ class IsoAnalysis(object):
         self.exons_composition_df = self.clusters.exon_composition_df
         self.junction_pseudotrans = self.clusters.junction_pseudtrans
         self.junction_libraries = self.clusters.junction_libraries
+        self.read_transcript_key = self.clusters.read_transcript_key
 
         self.blast_df = self.clusters.blast_df
 
@@ -305,8 +306,9 @@ class TranscriptCluster(object):
         self.blast_df = self._run_blast_versus_exons()
         self.exon_composition_df = self._get_exon_composition_from_blast()
         self.cluster_df = self._cluster_reads()
-        self.junction_pseudtrans = self._get_junction_composition(all_reads=False)
-        self.junction_libraries = self._get_junction_composition(all_reads=True)
+        self.junction_pseudtrans = self._get_junction_composition(libraries=False)
+        self.junction_libraries = self._get_junction_composition(libraries=True)
+        self.read_transcript_key = self._get_correspondance_read_transcript()
         # self.export()
 
     def __repr__(self):
@@ -410,11 +412,11 @@ class TranscriptCluster(object):
         )
         return junctions
 
-    def _get_junction_composition(self, all_reads=True):
+    def _get_junction_composition(self, libraries=True):
         """ Returns a DataFrame with summary information on the population of transcripts.
         """
 
-        if all_reads:
+        if libraries:
             junctions = self.exon_composition_df.apply(self._get_junctions, axis=1)
             # This produce the junction composition table
             junctions_df = (
@@ -443,6 +445,26 @@ class TranscriptCluster(object):
         junctions_df = junctions_df.astype(bool)
 
         return junctions_df
+
+    def _get_correspondance_read_transcript(self):
+        """Create a table which is giving the corresponding transcript identified by
+        exon composition to each read
+        """
+
+        read_transcript_key = []
+
+        for index, row in self.cluster_df.read_ids.to_frame().iterrows():
+            for record in row.values:
+                for lib, transcript in record:
+                    read_transcript_key.append([lib, transcript, index])
+
+        read_transcript_key = pd.DataFrame(
+            read_transcript_key, columns=["library", "read_id", "transcript_id"]
+        )
+        read_transcript_key.set_index(["library", "read_id"], inplace=True)
+        read_transcript_key.sort_index(inplace=True)
+
+        return pd.DataFrame(read_transcript_key)
 
     def export(self):
         """ Export the results of the clustering to self.out_dir:
