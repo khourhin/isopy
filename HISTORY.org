@@ -35,14 +35,16 @@ names "altvX" with X refering to their place in alternative exons order by read 
   - Quantification by alignment to pseudo-transcriptome (downweight for multimappers), TMM norm.
     
 * History
-** TODO 0.4.0 Implement multiple fasta [3/4]
-   SCHEDULED: <2019-08-16 Fri>
+** DONE 0.4.0 Implement multiple fasta [4/4]
+   CLOSED: [2019-08-08 Thu 16:09] SCHEDULED: <2019-08-16 Fri>
+
+<2019-08-08 Thu>
 
 - [X] Allow for multiple fasta files input and keep library information
 
 - [X] Simplify interface and create scripts
 
-- [ ] Implement cryptic exons
+- [X] Implement cryptic exons
 
 - [X] Export all tables to csv
 
