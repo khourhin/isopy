@@ -4,7 +4,6 @@
 """Tests for `isopy` package."""
 
 from easydev import md5
-from click.testing import CliRunner
 import pandas as pd
 
 import isopy.isopy as iso

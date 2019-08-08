@@ -1,4 +1,4 @@
-transcript_id,E1,E2,E3,E4,read_ids,frequency
+transcript_id,E1_0,E2_0,E3_0,E4_0,read_ids,frequency
 transcript_1,TRUE,TRUE,TRUE,TRUE,read1,1
 transcript_2,TRUE,TRUE,FALSE,TRUE,read2,1
 transcript_3,TRUE,FALSE,TRUE,TRUE,read3,1

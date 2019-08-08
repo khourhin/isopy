@@ -171,6 +171,7 @@ class ExonIdentifier(object):
         self.exons_df = self._extract_raw_exons()
         self._filter_exons_by_canonical_splice_sites()
         self._filter_exons_by_read_support(min_read_count)
+        self._naming_exons()
 
         self.exon_fas_fn, self.exon_bed_fn = self.export()
 
@@ -267,6 +268,35 @@ class ExonIdentifier(object):
 
         logging.debug("Filter exons by read support DONE")
 
+    def _naming_exons(self):
+        """ Return a list of exon names, considering the coordinates of each exons to define alternative exons
+        """
+
+        df = self.exons_df.copy()
+        # Sorting the exons by start and length to be sure to have the
+        # alternative exons (ie shorter ones) after the main exon (ie the longer one) to
+        # have proper exon names
+        df["length"] = df.end - df.start
+        df.sort_values(["start", "length"])
+        count = 0
+        exon_names = []
+
+        for label, exon in df.iterrows():
+
+            df_filtered = df[
+                (exon.start >= df.start) & (exon.end <= df.end) & (df.index != label)
+            ]
+            if df_filtered.empty:
+                count += 1
+                count_alt = 0
+                exon_names.append(f"E{count}_{count_alt}")
+
+            else:
+                count_alt += 1
+                exon_names.append(f"E{count}_{count_alt}")
+
+        self.exons_df.insert(3, "exon_id", exon_names)
+
     def export(self):
         """ Convert the dataframe self.exons_df to a bed file and fasta file
         and name the exons.
@@ -275,15 +305,13 @@ class ExonIdentifier(object):
         exon_fas_fn = os.path.join(self.out_dir, "test.fas")
         exon_bed_fn = os.path.join(self.out_dir, "test.bed")
 
-        export_df = self.exons_df.copy()
-        export_df.insert(3, "exon_id", [f"E{n}" for n in range(1, len(export_df) + 1)])
-
         with open(exon_fas_fn, "w") as fas_out:
-            for index, exon in export_df.iterrows():
+            for index, exon in self.exons_df.iterrows():
                 fas_out.write(f">{exon.exon_id}\n{exon.sequence}\n")
 
-        export_df.drop(["sequence", "splice_sites"], axis=1, inplace=True)
-        BedTool.from_dataframe(export_df).saveas(exon_bed_fn)
+        BedTool.from_dataframe(
+            self.exons_df.drop(["sequence", "splice_sites"], axis=1)
+        ).saveas(exon_bed_fn)
 
         return (exon_fas_fn, exon_bed_fn)
 
