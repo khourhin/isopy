@@ -110,6 +110,12 @@ def build_fasta_bed_from_exon_composition(
 
 class IsoAnalysis(object):
     """ The complete isopy alternative splicing analysis
+
+    :param read_files_fas: List of paths to the fasta files with long reads.
+    :param genome_fas: Path to the fasta file of the genome to map to.
+    :param out_dir: Path to the output directory.
+    :param min_read_count: The minimum number of read supporting an exon for the the exon to be considered.
+    :param threads: The number of threads to use.
     """
 
     def __init__(

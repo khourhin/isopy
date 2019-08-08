@@ -35,7 +35,9 @@ Documentation Todolist
 Features
 --------
 
-- Identify exons using long read dataset
+- Identify exons and alternative exons using long read dataset and a reference genome
+- Detect alternative transcripts from the long read dataset using exon composition.
+- Compare alternative transcripts composition accross different samples.
 
 .. todo:: Complete features
 
