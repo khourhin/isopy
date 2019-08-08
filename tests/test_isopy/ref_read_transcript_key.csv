@@ -1,0 +1,8 @@
+library,read_id,transcript_id
+mock_multi_fasta_1.fas,f1_transcript_1,alternative_transcript_1
+mock_multi_fasta_1.fas,f1_transcript_2,alternative_transcript_4
+mock_multi_fasta_2.fas,f2_transcript_1,alternative_transcript_1
+mock_multi_fasta_2.fas,f2_transcript_3,alternative_transcript_3
+mock_multi_fasta_2.fas,f2_transcript_4,alternative_transcript_2
+mock_multi_fasta_3.fas,f3_transcript_1,alternative_transcript_1
+mock_multi_fasta_3.fas,f3_transcript_1_bis,alternative_transcript_1
