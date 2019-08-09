@@ -164,16 +164,21 @@ class ExonIdentifier(object):
         :param genome_fas: Path to the fasta file of the genome to map to.
         :param out_dir: Path to the output directory.
         :param min_read_count: The minimum number of read supporting an exon for the the exon to be considered.
+    :param bam: If you already performed the alignment of the libraries present in read_files_fas and merged them
         """
 
-    def __init__(self, read_files_fas, genome_fas, out_dir, min_read_count=0):
+    def __init__(self, read_files_fas, genome_fas, out_dir, min_read_count=0, bam=None):
         self.genome = genome_fas
         self.read_files_fas = read_files_fas
         self.out_dir = Path(out_dir)
         os.makedirs(self.out_dir)
 
-        self.merged_bam = self.out_dir / "merged.bam"
-        self._map_reads_to_genome()
+        if not bam:
+            self.merged_bam = self.out_dir / "merged.bam"
+            self._map_reads_to_genome()
+        else:
+            self.merged_bam = bam
+
         self.exons_df = self._extract_raw_exons()
         self._filter_exons_by_canonical_splice_sites()
         self._filter_exons_by_read_support(min_read_count)
@@ -220,8 +225,8 @@ class ExonIdentifier(object):
             sequence = BedTool.seq(
                 (row["chrom"], row["start"] - 2, row["end"] + 2), self.genome
             )
-            donor = sequence[0:2]
-            acceptor = sequence[-2:]
+            donor = sequence[0:2].upper()
+            acceptor = sequence[-2:].upper()
 
             # Series are used to cast the result of apply in 2 columns
             return pd.Series([sequence[2:-2], (donor, acceptor)])
