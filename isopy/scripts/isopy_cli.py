@@ -8,7 +8,7 @@ def parse_arguments():
     parser.add_argument(
         "-r",
         "--read_files_fas",
-        type=list,
+        nargs="+",
         help="List of path to the fasta files with reads",
     )
     parser.add_argument(
@@ -25,8 +25,11 @@ def parse_arguments():
         "--min_read_count",
         help="Minimum number of long reads which supports an exon to consider this exon",
         default=0,
+        type=int,
     )
-    parser.add_argument("-t", "--threads", help="Number of threads to use", default=1)
+    parser.add_argument(
+        "-t", "--threads", help="Number of threads to use", default=1, type=int
+    )
 
     return parser.parse_args()
 
