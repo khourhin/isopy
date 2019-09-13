@@ -11,8 +11,11 @@
   chromosomes when checking splicing sites
 
 - Alternative exons could be defined by only overlap (1 base overlap is sufficient I
-think) not containing like currently. Also The main exon could be the one most
+think) not containing like currently. Also The main exon should be the one most
 supported by reads (instead of longest).
+
+- For alternative exons and clustering, we could have a reciprocal blast to see
+  if the best hit is the main exon or one of the alternative ones.
   
 * TODO Biblio                                                      :noexport:
   SCHEDULED: <2019-08-01 Thu>
