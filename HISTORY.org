@@ -3,6 +3,9 @@
 
 * Next                                                             :noexport:
 
+- Mapping should use fastq files (to make use of the quality) and maybe a
+  mapping quality threshold should be applied.
+
 - Verify how this is working and what would change with a gene on the - strand !!!
 
 - See [[file:~/hub/allemand/gphn/gphn.org::*Final%20Workflow][Final Workflow]]
