@@ -129,9 +129,13 @@ class IsoAnalysis(object):
             genome_fas,
             out_dir=self.out_dir,
             min_read_count=min_read_count,
+            threads=threads,
         )
         self.clusters = TranscriptCluster(
-            self.exons.exon_fas_fn, read_files_fas, out_dir=self.out_dir
+            self.exons.exon_fas_fn,
+            read_files_fas,
+            out_dir=self.out_dir,
+            threads=threads,
         )
         build_fasta_bed_from_exon_composition(
             self.exons.exon_fas_fn,
@@ -167,7 +171,9 @@ class ExonIdentifier(object):
     :param bam: If you already performed the alignment of the libraries present in read_files_fas and merged them
         """
 
-    def __init__(self, read_files_fas, genome_fas, out_dir, min_read_count=0, bam=None):
+    def __init__(
+        self, read_files_fas, genome_fas, out_dir, min_read_count=0, bam=None, threads=1
+    ):
         self.genome = genome_fas
         self.read_files_fas = read_files_fas
         self.out_dir = Path(out_dir)
@@ -196,7 +202,7 @@ class ExonIdentifier(object):
             bam = os.path.basename(os.path.splitext(read_file)[0] + ".bam")
             bam = self.out_dir / bam
 
-            minimap_cmd = f"minimap2 -ax splice -uf {self.genome} {read_file} \
+            minimap_cmd = f"minimap2 -t {self.threads}-ax splice -uf {self.genome} {read_file} \
             | samtools view -bh \
             | samtools sort \
             > {bam}"
