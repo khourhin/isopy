@@ -178,6 +178,7 @@ class ExonIdentifier(object):
         self.read_files_fas = read_files_fas
         self.out_dir = Path(out_dir)
         os.makedirs(self.out_dir)
+        self.threads = threads
 
         if not bam:
             self.merged_bam = self.out_dir / "merged.bam"
