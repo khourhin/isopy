@@ -36,7 +36,6 @@ def parse_arguments():
 
 def main():
 
-    print("ah")
     args = parse_arguments()
 
     isoseq = iso.IsoAnalysis(

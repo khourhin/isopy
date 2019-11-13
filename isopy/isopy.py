@@ -202,6 +202,7 @@ class ExonIdentifier(object):
             > {bam}"
 
             logging.debug("Minimap2 START")
+            logging.debug(minimap_cmd)
             _exec_command(minimap_cmd)
             logging.debug("Minimap2 DONE")
 
