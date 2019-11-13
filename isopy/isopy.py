@@ -203,7 +203,7 @@ class ExonIdentifier(object):
             bam = os.path.basename(os.path.splitext(read_file)[0] + ".bam")
             bam = self.out_dir / bam
 
-            minimap_cmd = f"minimap2 -t {self.threads}-ax splice -uf {self.genome} {read_file} \
+            minimap_cmd = f"minimap2 -t {self.threads} -ax splice -uf {self.genome} {read_file} \
             | samtools view -bh \
             | samtools sort \
             > {bam}"
