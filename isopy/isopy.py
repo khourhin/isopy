@@ -168,23 +168,23 @@ class ExonIdentifier(object):
         :param genome_fas: Path to the fasta file of the genome to map to.
         :param out_dir: Path to the output directory.
         :param min_read_count: The minimum number of read supporting an exon for the the exon to be considered.
-    :param bam: If you already performed the alignment of the libraries present in read_files_fas and merged them
         """
 
     def __init__(
-        self, read_files_fas, genome_fas, out_dir, min_read_count=0, bam=None, threads=1
+        self, read_files_fas, genome_fas, out_dir, min_read_count=0, threads=1
     ):
         self.genome = genome_fas
         self.read_files_fas = read_files_fas
         self.out_dir = Path(out_dir)
-        os.makedirs(self.out_dir)
+        if not self.out_dir.is_dir():
+            os.makedirs(self.out_dir)
         self.threads = threads
 
-        if not bam:
-            self.merged_bam = self.out_dir / "merged.bam"
-            self._map_reads_to_genome()
+        self.merged_bam = self.out_dir / "merged.bam"
+        if self.merged_bam.exists():
+            logging.info(f"Reusing mapping:{self.merged_bam}")
         else:
-            self.merged_bam = bam
+            self._map_reads_to_genome()
 
         self.exons_df = self._extract_raw_exons()
         self._filter_exons_by_canonical_splice_sites()
