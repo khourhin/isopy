@@ -457,9 +457,17 @@ class TranscriptCluster(object):
         Extract a string with all junctions (e.g 'E1_E2') separated by ','.
         """
         exons = list(row[row == True].index)
-        junctions = ",".join(
-            ["_".join(exons[i : i + 2]) for i in range(len(exons) - 1)]
-        )
+
+        # In case blast led to less than 2 hits (no, or only a single exon)
+        # So no junction can be inferred
+        if len(exons) < 2:
+            junctions = "No_junctions"
+
+        else:
+            junctions = ",".join(
+                ["_".join(exons[i : i + 2]) for i in range(len(exons) - 1)]
+            )
+
         return junctions
 
     def _get_junction_composition(self, libraries=True):
