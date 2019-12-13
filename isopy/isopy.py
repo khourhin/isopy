@@ -344,7 +344,7 @@ class TranscriptCluster(object):
     :param threads: Number of threads to use
     """
 
-    def __init__(self, exon_fas, read_files_fas, out_dir, prefix=None, threads=1):
+    def __init__(self, exon_fas, read_files_fas, out_dir, threads=1):
 
         self.exon_fas = exon_fas
         self.read_files_fas = read_files_fas
