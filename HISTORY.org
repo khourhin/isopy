@@ -21,7 +21,6 @@ supported by reads (instead of longest).
   if the best hit is the main exon or one of the alternative ones.
   
 * TODO Biblio                                                      :noexport:
-  SCHEDULED: <2019-10-01 Tue>
 
 - See with EA:
   Implement criteria to further selected exons like in https://www.biorxiv.org/content/early/2018/02/05/260562.full.pdf
