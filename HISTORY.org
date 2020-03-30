@@ -1,7 +1,7 @@
 #+OPTIONS: toc:nil num:nil author:nil todo:nil
 #+EXCLUDE_TAGS: noexport
 
-* Next                                                             :noexport:
+* TODO Next                                                        :noexport:
 
 - Mapping should use fastq files (to make use of the quality) and maybe a
   mapping quality threshold should be applied.
@@ -13,15 +13,26 @@
 - CORNERCASE: Adding chromsize to be sure to be in the bounderies of
   chromosomes when checking splicing sites
 
-- Alternative exons could be defined by only overlap (1 base overlap is sufficient I
-think) not containing like currently. Also The main exon should be the one most
-supported by reads (instead of longest).
+- DEAL WITH ALTERNATIVE EXONS:
 
-- For alternative exons and clustering, we could have a reciprocal blast to see
-  if the best hit is the main exon or one of the alternative ones.
+  - Alternative exons could be defined by only overlap (1 base overlap is
+   sufficient I think) not containing like currently. Also The main exon should
+   be the one most supported by reads (instead of longest).
+
+  - For alternative exons and clustering, we could have a reciprocal blast to see
+    if the best hit is the main exon or one of the alternative ones.
+
+- Transcripts with less than 2 blast hits:
+
+  - [X] Add a column "no_junctions" to junction composition tables
+
+  - [ ] Add corresponding tests
+
+    - Transcripts with a single exon hit
+
+    - Transcripts with no exon hit at all
   
 * TODO Biblio                                                      :noexport:
-  SCHEDULED: <2019-10-01 Tue>
 
 - See with EA:
   Implement criteria to further selected exons like in https://www.biorxiv.org/content/early/2018/02/05/260562.full.pdf
