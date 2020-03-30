@@ -382,9 +382,10 @@ class TranscriptCluster(object):
         for fasta in self.read_files_fas:
 
             blast_cmd = f"blastn -num_threads {self.threads} -outfmt 6 -task 'blastn-short' \
-            -evalue 0.001 -penalty -2 -query {fasta} -db {self.exon_fas} > {(self.out_dir / blast_out_fn)}"
+            -evalue 0.05 -penalty -1 -query {fasta} -db {self.exon_fas} > {(self.out_dir / blast_out_fn)}"
 
             _exec_command(blast_cmd)
+            logger.info(blast_cmd)
 
             fields = [
                 "query",
