@@ -1,7 +1,7 @@
 #+OPTIONS: toc:nil num:nil author:nil todo:nil
 #+EXCLUDE_TAGS: noexport
 
-* TODO Next                                                        :noexport:
+* TODO [#B] Next                                                   :noexport:
 
 - Mapping should use fastq files (to make use of the quality) and maybe a
   mapping quality threshold should be applied.
@@ -32,7 +32,7 @@
 
     - Transcripts with no exon hit at all
   
-* TODO Biblio                                                      :noexport:
+* TODO [#B] Biblio                                                 :noexport:
 
 - See with EA:
   Implement criteria to further selected exons like in https://www.biorxiv.org/content/early/2018/02/05/260562.full.pdf
