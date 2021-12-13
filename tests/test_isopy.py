@@ -12,31 +12,38 @@ THREADS = 4
 
 
 def test_Transcripts(tmpdir, datadir):
-    """ Test the Transcripts object
-    """
+    """Test the Transcripts object"""
 
-    exon_bed, junction_bed, fasta_out = iso.build_fasta_bed_from_exon_composition(
+    fasta_out = tmpdir / "mock_transcripts.fas"
+    exon_bed_out = tmpdir / "mock_exons.bed"
+    junction_bed_out = tmpdir / "mock_junctions.bed"
+
+    iso.build_fasta_bed_from_exon_composition(
         (datadir / "mock_exons.fas"),
         pd.read_csv(datadir / "mock_exon_composition.csv", index_col=0),
-        fasta_out=(tmpdir / "mock_transcripts.fas"),
-        exon_bed_out=(tmpdir / "mock_exons.bed"),
-        junction_bed_out=(tmpdir / "mock_junctions.bed"),
+        fasta_out=fasta_out,
+        exon_bed_out=exon_bed_out,
+        junction_bed_out=junction_bed_out,
     )
 
     assert md5(fasta_out) == md5(datadir / "ref_mock_transcripts.fas")
-    assert md5(exon_bed.path) == md5(datadir / "ref_mock_exons.bed")
-    assert md5(junction_bed.path) == md5(datadir / "ref_mock_junctions.bed")
+    assert md5(exon_bed_out) == md5(datadir / "ref_mock_exons.bed")
+    assert md5(junction_bed_out) == md5(datadir / "ref_mock_junctions.bed")
 
 
 def test_ExonIdentifier(tmpdir, datadir):
-    """ Test the ExonIdentifier object
-    """
-    exon_bed, junction_bed, fasta_out = iso.build_fasta_bed_from_exon_composition(
+    """Test the ExonIdentifier object"""
+
+    fasta_out = tmpdir / "mock_transcripts.fasta"
+    exon_bed_out = tmpdir / "mock_exons.bed"
+    junction_bed_out = tmpdir / "mock_junction.bed"
+
+    iso.build_fasta_bed_from_exon_composition(
         (datadir / "mock_exons.fas"),
         pd.read_csv(datadir / "mock_exon_composition.csv", index_col=0),
-        fasta_out=(tmpdir / "mock_transcripts.fasta"),
-        exon_bed_out=(tmpdir / "mock_exons.bed"),
-        junction_bed_out=(tmpdir / "mock_junction.bed"),
+        fasta_out=fasta_out,
+        exon_bed_out=exon_bed_out,
+        junction_bed_out=junction_bed_out,
     )
 
     exons = iso.ExonIdentifier(
@@ -50,8 +57,7 @@ def test_ExonIdentifier(tmpdir, datadir):
 
 
 def test_multi_fasta(tmpdir, datadir):
-    """ Test the implementation with multiple fasta files
-    """
+    """Test the implementation with multiple fasta files"""
 
     fastas = [
         (datadir / "mock_multi_fasta_1.fas"),
@@ -99,7 +105,7 @@ def test_multi_fasta(tmpdir, datadir):
 
 
 def test_IsoAnalysis(tmpdir, datadir):
-    """ Test the whole pipeline IsoAnalysis
+    """Test the whole pipeline IsoAnalysis
 
     TOFIX So far only check the IsoAnalysis.read_transcript_key table
     """
@@ -116,7 +122,5 @@ def test_IsoAnalysis(tmpdir, datadir):
 
     pd.testing.assert_frame_equal(
         isoseq.read_transcript_key,
-        pd.read_csv(
-            datadir / "ref_read_transcript_key.csv", index_col=["library", "read_id"]
-        ),
+        pd.read_csv(datadir / "ref_read_transcript_key.csv", index_col=["library", "read_id"]),
     )

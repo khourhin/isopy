@@ -1,8 +1,7 @@
 """A library for alternative splicing analysis using long read technology """
 
-from pynextgen.basics_fasta import Fasta
+# from pynextgen.basics_fasta import Fasta
 from pybedtools import BedTool
-import pynextgen.bed as bed
 import pandas as pd
 import numpy as np
 import subprocess
@@ -10,18 +9,25 @@ import os
 import logging
 from natsort import natsorted
 from pathlib import Path
+from pysam import FastxFile
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
-# Number of basis in 5' and 3' of a junction to make it specific in our dataset
+# Number of bases in 5' and 3' of a junction to make it specific in our dataset
 OVERHANG_5 = 9
 OVERHANG_3 = 6
 
 
+def df_to_bed(df, path):
+    """Create a bed object from a pandas dataframe"""
+
+    df.to_csv(path, sep="\t", header=None, index=False)
+    return Bed(path)
+
+
 def _exec_command(cmd, silent=False):
-    """ Wrapper for proper execution of subprocesses
-    """
+    """Wrapper for proper execution of subprocesses"""
 
     try:
         proc = subprocess.run(
@@ -40,11 +46,8 @@ def _exec_command(cmd, silent=False):
         raise ChildProcessError(exc.stderr)
 
 
-def build_fasta_bed_from_exon_composition(
-    exon_fas, cluster_df, fasta_out, exon_bed_out, junction_bed_out
-):
-    """ Build fasta and bed files with pseudo-transcripts. These pseudo-transcript are obtained by a concatenation of the exon sequences (found in exon_fas) following an exon composition matrix (cluster_df)
-    """
+def build_fasta_bed_from_exon_composition(exon_fas, cluster_df, fasta_out, exon_bed_out, junction_bed_out):
+    """Build fasta and bed files with pseudo-transcripts. These pseudo-transcript are obtained by a concatenation of the exon sequences (found in exon_fas) following an exon composition matrix (cluster_df)"""
 
     def _get_exons(row):
         """
@@ -54,10 +57,12 @@ def build_fasta_bed_from_exon_composition(
         exons = list(row[row == True].index)
         return exons
 
-    transcript_exon_list = cluster_df.drop(["read_ids", "frequency"], axis=1).apply(
-        _get_exons, axis=1
-    )
-    exon_seqs = Fasta(exon_fas).to_dict()
+    transcript_exon_list = cluster_df.drop(["read_ids", "frequency"], axis=1).apply(_get_exons, axis=1)
+
+    exon_seqs = {}
+    with FastxFile(exon_fas) as fas:
+        for entry in fas:
+            exon_seqs[entry.name] = entry.sequence
 
     seq_dict = {}
 
@@ -65,18 +70,13 @@ def build_fasta_bed_from_exon_composition(
     junction_bed_df = pd.DataFrame()
 
     for transcript_id, exon_compo in transcript_exon_list.iteritems():
-        seq_dict[transcript_id] = "".join(
-            [exon_seqs[exon_id] for exon_id in exon_compo]
-        )
+        seq_dict[transcript_id] = "".join([exon_seqs[exon_id] for exon_id in exon_compo])
 
         # Define exon intervals on transcripts, using length of each exons summed
         exon_annot = pd.DataFrame(
             {
                 "chr": [transcript_id for _ in exon_compo],
-                "start": [0]
-                + list(
-                    np.cumsum([len(exon_seqs[exon_id]) for exon_id in exon_compo])[:-1]
-                ),
+                "start": [0] + list(np.cumsum([len(exon_seqs[exon_id]) for exon_id in exon_compo])[:-1]),
                 "end": np.cumsum([len(exon_seqs[exon_id]) for exon_id in exon_compo]),
                 "name": [exon_id for exon_id in exon_compo],
                 "score": "0",
@@ -88,8 +88,7 @@ def build_fasta_bed_from_exon_composition(
         junction_annot.end = junction_annot.start + OVERHANG_3
         junction_annot.start = junction_annot.start - OVERHANG_5
         junction_names = [
-            f"junction_{exon_1}_{exon_2}"
-            for exon_1, exon_2 in zip(junction_annot.name[:-1], junction_annot.name[1:])
+            f"junction_{exon_1}_{exon_2}" for exon_1, exon_2 in zip(junction_annot.name[:-1], junction_annot.name[1:])
         ]
         junction_annot = junction_annot[1:]
         junction_annot.name = junction_names
@@ -98,18 +97,16 @@ def build_fasta_bed_from_exon_composition(
         exon_bed_df = pd.concat([exon_bed_df, exon_annot], axis=0)
         junction_bed_df = pd.concat([junction_bed_df, junction_annot], axis=0)
 
-    exon_bed = bed.df_to_bed(exon_bed_df, exon_bed_out)
-    junction_bed = bed.df_to_bed(junction_bed_df, junction_bed_out)
+    exon_bed_df.to_csv(exon_bed_out, sep="\t", header=None, index=False)
+    junction_bed_df.to_csv(junction_bed_out, sep="\t", header=None, index=False)
 
     with open(fasta_out, "w") as f:
         for transcript in seq_dict:
             f.write(f">{transcript}\n{seq_dict[transcript]}\n")
 
-    return exon_bed, junction_bed, fasta_out
-
 
 class IsoAnalysis(object):
-    """ The complete isopy alternative splicing analysis
+    """The complete isopy alternative splicing analysis
 
     :param read_files_fas: List of paths to the fasta files with long reads.
     :param genome_fas: Path to the fasta file of the genome to map to.
@@ -118,9 +115,7 @@ class IsoAnalysis(object):
     :param threads: The number of threads to use.
     """
 
-    def __init__(
-        self, read_files_fas, genome_fas, out_dir, min_read_count=0, threads=1
-    ):
+    def __init__(self, read_files_fas, genome_fas, out_dir, min_read_count=0, threads=1):
 
         self.out_dir = Path(out_dir)
 
@@ -162,17 +157,15 @@ class IsoAnalysis(object):
 
 
 class ExonIdentifier(object):
-    """ A tool to identify exons from long reads and a reference genome
+    """A tool to identify exons from long reads and a reference genome
 
-        :param read_files_fas: List of paths to the fasta files with long reads.
-        :param genome_fas: Path to the fasta file of the genome to map to.
-        :param out_dir: Path to the output directory.
-        :param min_read_count: The minimum number of read supporting an exon for the the exon to be considered.
-        """
+    :param read_files_fas: List of paths to the fasta files with long reads.
+    :param genome_fas: Path to the fasta file of the genome to map to.
+    :param out_dir: Path to the output directory.
+    :param min_read_count: The minimum number of read supporting an exon for the the exon to be considered.
+    """
 
-    def __init__(
-        self, read_files_fas, genome_fas, out_dir, min_read_count=0, threads=1
-    ):
+    def __init__(self, read_files_fas, genome_fas, out_dir, min_read_count=0, threads=1):
         self.genome = genome_fas
         self.read_files_fas = read_files_fas
         self.out_dir = Path(out_dir)
@@ -194,8 +187,7 @@ class ExonIdentifier(object):
         self.exon_fas_fn, self.exon_bed_fn = self.export()
 
     def _map_reads_to_genome(self):
-        """ Map long reads to the genome. Using Minimap2.
-        """
+        """Map long reads to the genome. Using Minimap2."""
         bams = []
 
         for read_file in self.read_files_fas:
@@ -222,17 +214,13 @@ class ExonIdentifier(object):
         logging.debug("Samtools merge DONE")
 
     def _extract_raw_exons(self):
-        """ From the bam alignment, get a dataframe with the regions of putative exons
-        """
+        """From the bam alignment, get a dataframe with the regions of putative exons"""
 
         def get_sequence_and_splice_sites(row):
-            """ Function to apply to an exon dataframe to obtain exon sequence and splice sites
-            """
+            """Function to apply to an exon dataframe to obtain exon sequence and splice sites"""
 
             # Get 2 bases upstream and downstream of the exon
-            sequence = BedTool.seq(
-                (row["chrom"], row["start"] - 2, row["end"] + 2), self.genome
-            )
+            sequence = BedTool.seq((row["chrom"], row["start"] - 2, row["end"] + 2), self.genome)
             donor = sequence[0:2].upper()
             acceptor = sequence[-2:].upper()
 
@@ -241,45 +229,34 @@ class ExonIdentifier(object):
 
         logging.debug("Raw exon extraction START")
         # Extract mapped intervals from the bam alignement file
-        exons_df = (
-            BedTool(str(self.merged_bam)).bam_to_bed(split=True).sort().to_dataframe()
-        )
+        exons_df = BedTool(str(self.merged_bam)).bam_to_bed(split=True).sort().to_dataframe()
 
         # Keep only interval information
         exons_df = exons_df.loc[:, ["chrom", "start", "end"]]
 
         # Add number of reads found to support a particular exon
-        exons_df = (
-            exons_df.groupby(["chrom", "start", "end"])
-            .size()
-            .reset_index(name="frequency")
-        )
+        exons_df = exons_df.groupby(["chrom", "start", "end"]).size().reset_index(name="frequency")
 
         # Add sequence and splice sites information
-        exons_df[["sequence", "splice_sites"]] = exons_df.apply(
-            get_sequence_and_splice_sites, axis=1
-        )
+        exons_df[["sequence", "splice_sites"]] = exons_df.apply(get_sequence_and_splice_sites, axis=1)
 
         logging.debug("Raw exon extraction DONE")
         return exons_df
 
     def _filter_exons_by_canonical_splice_sites(self):
-        """ Keep only exons with canonical splices sites
+        """Keep only exons with canonical splices sites
         (ie GT-AG, AT-AC, GT-AC, AT-AG)
         """
 
         logging.debug("Filter exons by canonical splice sites START")
 
         canonical_junctions = (("AG", "GT"), ("AC", "AT"), ("AC", "GT"), ("AG", "AT"))
-        self.exons_df = self.exons_df.loc[
-            self.exons_df.splice_sites.isin(canonical_junctions)
-        ]
+        self.exons_df = self.exons_df.loc[self.exons_df.splice_sites.isin(canonical_junctions)]
 
         logging.debug("Filter exons by canonical splice sites DONE")
 
     def _filter_exons_by_read_support(self, n):
-        """ Filter only exons supported by at least n reads.
-        """
+        """Filter only exons supported by at least n reads."""
 
         logging.debug("Filter exons by read support START")
 
@@ -288,8 +265,7 @@ class ExonIdentifier(object):
         logging.debug("Filter exons by read support DONE")
 
     def _naming_exons(self):
-        """ Return a list of exon names, considering the coordinates of each exons to define alternative exons
-        """
+        """Return a list of exon names, considering the coordinates of each exons to define alternative exons"""
 
         df = self.exons_df.copy()
         # Sorting the exons by start and length to be sure to have the
@@ -302,9 +278,7 @@ class ExonIdentifier(object):
 
         for label, exon in df.iterrows():
 
-            df_filtered = df[
-                (exon.start >= df.start) & (exon.end <= df.end) & (df.index != label)
-            ]
+            df_filtered = df[(exon.start >= df.start) & (exon.end <= df.end) & (df.index != label)]
             if df_filtered.empty:
                 count += 1
                 count_alt = 0
@@ -317,7 +291,7 @@ class ExonIdentifier(object):
         self.exons_df.insert(3, "exon_id", exon_names)
 
     def export(self):
-        """ Convert the dataframe self.exons_df to a bed file and fasta file
+        """Convert the dataframe self.exons_df to a bed file and fasta file
         and name the exons.
         """
 
@@ -328,16 +302,14 @@ class ExonIdentifier(object):
             for index, exon in self.exons_df.iterrows():
                 fas_out.write(f">{exon.exon_id}\n{exon.sequence}\n")
 
-        BedTool.from_dataframe(
-            self.exons_df.drop(["sequence", "splice_sites"], axis=1)
-        ).saveas(exon_bed_fn)
+        BedTool.from_dataframe(self.exons_df.drop(["sequence", "splice_sites"], axis=1)).saveas(exon_bed_fn)
 
         return (exon_fas_fn, exon_bed_fn)
 
 
 class TranscriptCluster(object):
-    """ Cluster long reads based on their exon composition. 
-    
+    """Cluster long reads based on their exon composition.
+
     :param exon_fas: Path to the fasta file with the exon sequences
     :param read_files_fas: List of path to the fasta files with reads
     :param out_dir: Path to the output directory
@@ -366,15 +338,13 @@ class TranscriptCluster(object):
         return "<TranscriptCluster object for Iso-seq analyis>"
 
     def _format_blast_db(self):
-        """ Generate the blast db for exons using makeblastdb
-        """
+        """Generate the blast db for exons using makeblastdb"""
 
         blastdb_cmd = f"makeblastdb -dbtype nucl -in {self.exon_fas}"
         _exec_command(blastdb_cmd)
 
     def _run_blast_versus_exons(self):
-        """ Execute blast of transcripts against exons identified by ExonIdentifier
-        """
+        """Execute blast of transcripts against exons identified by ExonIdentifier"""
 
         blast_dfs = []
         blast_out_fn = "blast_out.tab"
@@ -402,9 +372,7 @@ class TranscriptCluster(object):
                 "bit_score",
             ]
 
-            blast_df = pd.read_csv(
-                (self.out_dir / blast_out_fn), sep="\t", names=fields
-            )
+            blast_df = pd.read_csv((self.out_dir / blast_out_fn), sep="\t", names=fields)
             blast_df.loc[:, "library"] = os.path.basename(fasta)
 
             blast_dfs.append(blast_df)
@@ -413,8 +381,7 @@ class TranscriptCluster(object):
         return blast_df
 
     def _get_exon_composition_from_blast(self, id_threshold=90):
-        """ Filter blast results by identity percent threshold
-        """
+        """Filter blast results by identity percent threshold"""
 
         exon_composition_df = (
             pd.pivot_table(
@@ -432,23 +399,21 @@ class TranscriptCluster(object):
         return exon_composition_df
 
     def _cluster_reads(self, prefix="alternative_transcript_"):
-        """ Cluster reads based on their exon composition
+        """Cluster reads based on their exon composition
 
         :param prefix: The prefix to put for transcript cluster names
         """
 
         # Group by exon composition and create tuple of reads id corresponding to an exon composition
-        cluster_df = self.exon_composition_df.groupby(
-            self.exon_composition_df.columns.to_list()
-        ).apply(lambda x: tuple(x.index))
+        cluster_df = self.exon_composition_df.groupby(self.exon_composition_df.columns.to_list()).apply(
+            lambda x: tuple(x.index)
+        )
         cluster_df = cluster_df.reset_index(name="read_ids")
 
         cluster_df["frequency"] = cluster_df["read_ids"].apply(len)
         cluster_df.sort_values("frequency", ascending=False, inplace=True)
 
-        cluster_df["transcript_id"] = [
-            f"{prefix}{n}" for n in range(1, cluster_df.index.size + 1)
-        ]
+        cluster_df["transcript_id"] = [f"{prefix}{n}" for n in range(1, cluster_df.index.size + 1)]
         cluster_df.set_index("transcript_id", inplace=True)
 
         return cluster_df
@@ -465,15 +430,12 @@ class TranscriptCluster(object):
             junctions = "No_junctions"
 
         else:
-            junctions = ",".join(
-                ["_".join(exons[i : i + 2]) for i in range(len(exons) - 1)]
-            )
+            junctions = ",".join(["_".join(exons[i : i + 2]) for i in range(len(exons) - 1)])
 
         return junctions
 
     def _get_junction_composition(self, libraries=True):
-        """ Returns a DataFrame with summary information on the population of transcripts.
-        """
+        """Returns a DataFrame with summary information on the population of transcripts."""
 
         if libraries:
             junctions = self.exon_composition_df.apply(self._get_junctions, axis=1)
@@ -486,9 +448,7 @@ class TranscriptCluster(object):
             ).fillna(0)
 
         else:
-            junctions = self.cluster_df.drop(["read_ids", "frequency"], axis=1).apply(
-                self._get_junctions, axis=1
-            )
+            junctions = self.cluster_df.drop(["read_ids", "frequency"], axis=1).apply(self._get_junctions, axis=1)
             # This produce the junction composition table
             junctions_df = (
                 junctions.str.split(",", expand=True)
@@ -517,16 +477,14 @@ class TranscriptCluster(object):
                 for lib, transcript in record:
                     read_transcript_key.append([lib, transcript, index])
 
-        read_transcript_key = pd.DataFrame(
-            read_transcript_key, columns=["library", "read_id", "transcript_id"]
-        )
+        read_transcript_key = pd.DataFrame(read_transcript_key, columns=["library", "read_id", "transcript_id"])
         read_transcript_key.set_index(["library", "read_id"], inplace=True)
         read_transcript_key.sort_index(inplace=True)
 
         return pd.DataFrame(read_transcript_key)
 
     def export(self):
-        """ Export the results of the clustering to self.out_dir:
+        """Export the results of the clustering to self.out_dir:
         - Exon composition csv
         - Reads clustered in various fasta file corresponding to their cluster name (transcript/isoform)
         """
